@@ -5,9 +5,13 @@ import json
 import pytest
 
 from utils.schema_utils import (
+    ValidationFailure,
     format_path,
     format_summary,
+    ok_result,
     resolve_draft,
+    stringify_parameter,
+    unexpected_failure_result,
     validate_json_input,
 )
 
@@ -28,7 +32,19 @@ PERSON_JSON = json.dumps({"name": "Alice", "age": 30, "tags": ["admin"]})
 
 
 def run(json_input, schema_input):
-    return validate_json_input(json_input, schema_input)
+    # Mirror the tool boundary: adapt raw parameter values first, then call
+    # the strict strings-only validator, and convert every escape into the
+    # structured payload.
+    try:
+        validate_json_input(
+            stringify_parameter(json_input, "json_input"),
+            stringify_parameter(schema_input, "schema_input"),
+        )
+        return ok_result()
+    except ValidationFailure as failure:
+        return failure.to_result()
+    except Exception as escaped:
+        return unexpected_failure_result(escaped)
 
 
 class TestValidationSuccess:
