@@ -411,7 +411,7 @@ class TestNeverRaises:
 
 
 class TestDeepNesting:
-    """The tool must never raise, no matter how the input is shaped."""
+    """Nothing may raise, and realistic depths must never be rejected."""
 
     @staticmethod
     def _nested_schema_text(depth: int) -> str:
@@ -419,6 +419,46 @@ class TestDeepNesting:
             '{"type":"object","properties":{"n":' * depth
             + '{"type":"object"}'
             + "}" * (2 * depth)
+        )
+
+    @staticmethod
+    def _nested_data_text(depth: int) -> str:
+        return '{"value":1,"children":[' * depth + '{"value":1}' + "]}" * depth
+
+    RECURSIVE_SCHEMA = json.dumps(
+        {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$defs": {
+                "node": {
+                    "type": "object",
+                    "required": ["value"],
+                    "properties": {
+                        "value": {"type": "integer"},
+                        "children": {"type": "array", "items": {"$ref": "#/$defs/node"}},
+                    },
+                }
+            },
+            "$ref": "#/$defs/node",
+        }
+    )
+
+    @pytest.mark.parametrize("depth", [1, 5, 20, 50, 80])
+    def test_realistic_depths_validate_normally(self, depth):
+        # Realistic schemas sit at 3-30 levels; the default recursion limit
+        # covers ~95, so nothing in this range may be rejected.
+        result = run('{"n": {"n": {}}}', self._nested_schema_text(depth))
+        assert result["is_valid"] is True
+
+    def test_recursive_schema_over_deep_data_validates(self):
+        # Data follows a recursive schema; depth is bounded by both.
+        assert run(self._nested_data_text(50), self.RECURSIVE_SCHEMA)["is_valid"] is True
+
+    def test_recursive_schema_in_strict_mode(self):
+        assert (
+            run(self._nested_data_text(50), self.RECURSIVE_SCHEMA, strict_mode=True)[
+                "is_valid"
+            ]
+            is True
         )
 
     def test_deeply_nested_json_is_reported_not_raised(self):
@@ -431,22 +471,19 @@ class TestDeepNesting:
         assert result["error_type"] == "invalid_schema_json"
         assert "nested too deeply" in result["error"]
 
-    def test_deep_but_parseable_schema_still_validates(self):
-        # ~1200 levels parses fine and must not be rejected as "too deep":
-        # the recursion limit is raised for the validation phase.
-        result = run('{"n": {"n": {}}}', self._nested_schema_text(1200))
-        assert result["is_valid"] is True
+    def test_schema_past_the_default_limit_is_reported_not_raised(self):
+        # ~95 levels is where the default limit runs out; the schema is the
+        # thing to change, so this is a schema_error rather than a crash.
+        result = run('{"n": {}}', self._nested_schema_text(300))
+        assert result["is_valid"] is False
+        assert result["error_type"] == "schema_error"
+        assert "nested too deeply" in result["error"]
 
-    def test_recursion_limit_is_restored(self):
-        import sys
-
-        before = sys.getrecursionlimit()
-        run('{"a": 1}', '{"type": "object"}')
-        assert sys.getrecursionlimit() == before
-
-    def test_deeply_nested_instance_with_strict_mode(self):
-        schema = self._nested_schema_text(1200)
-        assert run('{"n": {"n": {}}}', schema, strict_mode=True)["is_valid"] is True
+    def test_data_past_the_default_limit_is_reported_not_raised(self):
+        result = run(self._nested_data_text(400), self.RECURSIVE_SCHEMA)
+        assert result["is_valid"] is False
+        assert result["error_type"] == "internal_error"
+        assert "nested too deeply" in result["error"]
 
 
 class TestDraftUriScoping:
@@ -497,6 +534,9 @@ class TestMarkdownFenceRecovery:
         fenced = '```json\n{"name": "Alice",}\n```'
         result = run(fenced, PERSON_SCHEMA)
         assert result["error_type"] == "invalid_json"
+
+
+class TestFormatting:
     def test_format_path_root(self):
         assert format_path([]) == "$ (root)"
 

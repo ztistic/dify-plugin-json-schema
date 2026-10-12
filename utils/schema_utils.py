@@ -12,9 +12,7 @@ from __future__ import annotations
 import copy
 import json
 import re
-import sys
-from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any
 
 import jsonschema
 import jsonschema.exceptions
@@ -297,25 +295,17 @@ def _looks_like_object(subschema: dict[str, Any]) -> bool:
     return "properties" in subschema or "required" in subschema
 
 
-# ``jsonschema`` validates a schema against its metaschema in pure Python and
-# burns roughly ten interpreter frames per nesting level, so CPython's default
-# limit of 1000 rejects any schema nested more than ~100 levels -- far too low
-# for hand-written schemas. Raising the limit is safe here because pure-Python
-# calls no longer grow the C stack; beyond the raised limit the code still
-# fails gracefully with a structured error instead of crashing.
-_RECURSION_LIMIT = 20000
-
-
-@contextmanager
-def _deeper_recursion_limit() -> Iterator[None]:
-    """Temporarily raise the recursion limit, always restoring it afterwards."""
-    previous = sys.getrecursionlimit()
-    if previous < _RECURSION_LIMIT:
-        sys.setrecursionlimit(_RECURSION_LIMIT)
-    try:
-        yield
-    finally:
-        sys.setrecursionlimit(previous)
+# Deliberately NOT raising CPython's recursion limit. ``jsonschema`` validates a
+# schema against its metaschema in pure Python and burns roughly ten interpreter
+# frames per nesting level, so the default limit of 1000 admits schemas up to
+# ~95 levels deep, and validates data up to ~100-200 levels deep against a
+# recursive schema. That is far beyond anything an LLM emits or a human writes
+# (realistic schemas sit at 3-30 levels), and every input past the boundary is
+# still answered with a structured error rather than an exception.
+#
+# Raising it would buy capability nobody needs while mutating process-global
+# state -- ``sys.setrecursionlimit`` affects every task sharing this process,
+# which is a poor trade for a plugin that runs inside a shared daemon.
 
 
 def format_path(path: Any) -> str:
@@ -406,55 +396,54 @@ def _validate(
         if draft_error is not None:
             return _fail("unsupported_draft", draft_error)
 
-    # Note: JSON parsing deliberately happens above, outside this guard, so the
-    # C-stack-driven json parser keeps running under the default limit.
-    with _deeper_recursion_limit():
-        effective_schema = apply_strict_mode(schema) if strict_mode else schema
+    effective_schema = apply_strict_mode(schema) if strict_mode else schema
 
-        try:
-            validator_cls.check_schema(effective_schema)
-        except SchemaError as error:
-            return _fail(
-                "schema_error",
-                f"Schema itself is invalid: {error.message}",
-                schema_path=list(error.absolute_schema_path),
-            )
-        except RecursionError:
-            # Metaschema validation recurses roughly once per nesting level, so
-            # a very deep schema exhausts the stack here. We cannot confirm such
-            # a schema, and the schema is what has to change.
-            return _fail(
-                "schema_error",
-                "Schema itself is invalid: the schema is nested too deeply to be checked",
-            )
+    try:
+        validator_cls.check_schema(effective_schema)
+    except SchemaError as error:
+        return _fail(
+            "schema_error",
+            f"Schema itself is invalid: {error.message}",
+            schema_path=list(error.absolute_schema_path),
+        )
+    except RecursionError:
+        # Metaschema validation burns ~10 frames per nesting level, so a schema
+        # deeper than ~95 levels exhausts the default stack here. Such a schema
+        # cannot be confirmed, and the schema is what has to change.
+        return _fail(
+            "schema_error",
+            "Schema itself is invalid: the schema is nested too deeply to be checked",
+        )
 
-        validator = validator_cls(effective_schema)
-        try:
-            error = best_match(validator.iter_errors(instance))
-        except ValidationError as validation_error:
-            error = validation_error
-        except _REF_RESOLUTION_ERRORS as ref_error:
-            return _fail(
-                "ref_resolution_error",
-                f"Schema $ref resolution failed: {ref_error}",
-            )
-        except SchemaError as structural_error:
-            return _fail(
-                "schema_error",
-                f"Schema itself is invalid: {structural_error.message}",
-                schema_path=list(structural_error.absolute_schema_path),
-            )
-        except RecursionError:
-            return _fail(
-                "internal_error",
-                "The JSON data or the schema is nested too deeply to be validated",
-            )
-        except Exception as unexpected:  # noqa: BLE001 - never raise
-            return _fail(
-                "internal_error",
-                f"Unexpected error while validating: "
-                f"{type(unexpected).__name__}: {unexpected}",
-            )
+    validator = validator_cls(effective_schema)
+    try:
+        error = best_match(validator.iter_errors(instance))
+    except ValidationError as validation_error:
+        error = validation_error
+    except _REF_RESOLUTION_ERRORS as ref_error:
+        return _fail(
+            "ref_resolution_error",
+            f"Schema $ref resolution failed: {ref_error}",
+        )
+    except SchemaError as structural_error:
+        return _fail(
+            "schema_error",
+            f"Schema itself is invalid: {structural_error.message}",
+            schema_path=list(structural_error.absolute_schema_path),
+        )
+    except RecursionError:
+        # Recurrence through the data (a recursive schema over deeply nested
+        # JSON) exhausts the stack. The data is the thing to change.
+        return _fail(
+            "internal_error",
+            "The JSON data or the schema is nested too deeply to be validated",
+        )
+    except Exception as unexpected:  # noqa: BLE001 - never raise
+        return _fail(
+            "internal_error",
+            f"Unexpected error while validating: "
+            f"{type(unexpected).__name__}: {unexpected}",
+        )
 
     if error is None:
         return _ok()

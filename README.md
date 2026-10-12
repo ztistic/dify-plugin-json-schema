@@ -52,13 +52,19 @@ reported as `invalid_json`.
 ### Nesting depth
 
 `jsonschema` validates a schema against its metaschema in pure Python and
-consumes roughly ten interpreter frames per nesting level, which would reject
-any schema nested deeper than ~100 levels under CPython's default recursion
-limit. The plugin therefore raises the recursion limit for the validation phase
-(and restores it afterwards), which supports schemas up to roughly 1900 levels.
+consumes roughly ten interpreter frames per nesting level. CPython's default
+recursion limit of 1000 therefore admits schemas up to ~95 levels deep, and
+validates data up to ~100-200 levels deep against a recursive schema.
 
-Beyond that, or for JSON documents too deep for the standard parser, the tool
-still answers with a structured error instead of crashing:
+The plugin deliberately leaves that limit alone. Those ceilings are far beyond
+anything an LLM emits or a human writes -- realistic schemas sit at 3-30 levels
+-- and every input past the boundary is still answered with a structured error
+rather than an exception. Raising the limit would buy capability nobody needs
+while mutating process-global state, since `sys.setrecursionlimit()` affects
+every task sharing the plugin process.
+
+Beyond those boundaries, or for JSON documents too deep for the standard parser,
+the tool still answers with a structured error instead of crashing:
 
 | Situation                                        | `error_type`          |
 |--------------------------------------------------|-----------------------|
