@@ -71,7 +71,7 @@ the tool still answers with a structured error instead of crashing:
 | JSON data too deep for `json.loads`              | `invalid_json`        |
 | JSON Schema too deep for `json.loads`            | `invalid_schema_json` |
 | Schema too deep for metaschema checking          | `schema_error`        |
-| Data or schema too deep for validation           | `internal_error`      |
+| Data too deep to validate, or a circular `$ref`  | `internal_error`      |
 
 ### Outputs
 

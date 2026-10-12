@@ -220,6 +220,30 @@ class TestRefResolution:
         result = run('{"a": 1}', schema)
         assert result["error_type"] == "ref_resolution_error"
 
+    @pytest.mark.parametrize(
+        "ref",
+        [
+            "#/$defs/Missing",
+            "#/definitions/Missing",
+            "#/$defs/",
+            "#/type",
+            "other.json",
+            "urn:example:foo",
+        ],
+    )
+    def test_every_unresolvable_ref_shape_is_classified(self, ref):
+        # All of these surface as referencing's Unresolvable, whatever the draft.
+        result = run('{"a": 1}', json.dumps({"$ref": ref}))
+        assert result["error_type"] == "ref_resolution_error"
+
+    def test_self_referential_root_ref_is_reported_not_hung(self):
+        # {"$ref": "#"} is a schema that validates itself forever; it must be
+        # reported, not loop.
+        result = run('{"a": 1}', '{"$ref": "#"}')
+        assert result["is_valid"] is False
+        assert result["error_type"] == "internal_error"
+        assert "circular $ref" in result["error"]
+
 
 class TestDraftSupport:
     @pytest.mark.parametrize(

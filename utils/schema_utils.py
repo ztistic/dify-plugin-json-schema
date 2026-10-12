@@ -14,8 +14,6 @@ import json
 import re
 from typing import Any
 
-import jsonschema
-import jsonschema.exceptions
 from jsonschema import (
     Draft201909Validator,
     Draft202012Validator,
@@ -24,6 +22,7 @@ from jsonschema import (
     Draft7Validator,
 )
 from jsonschema.exceptions import SchemaError, ValidationError, best_match
+from referencing.exceptions import Unresolvable
 
 # The draft that is used when a schema does not declare ``$schema``.
 DEFAULT_DRAFT_VERSION = "2020-12"
@@ -58,14 +57,11 @@ _BARE_DRAFT_PATTERN = re.compile(r"^draft[-/](\d{4}-\d{2}|0?\d)$", re.IGNORECASE
 # to pick a validator class.
 _DRAFT_VERSION_PATTERN = re.compile(r"draft[-/](\d{4}-\d{2}|0?\d)", re.IGNORECASE)
 
-try:
-    from jsonschema.exceptions import _RefResolutionError as RefResolutionError
-except ImportError:  # pragma: no cover - alternative jsonschema layouts
-    from referencing.exceptions import Unresolvable as RefResolutionError
-
-# Reference failures are surfaced by jsonschema as private wrapper classes
-# (``_WrappedReferencingError``), which derive from ``_RefResolutionError``.
-_REF_RESOLUTION_ERRORS: tuple[type[Exception], ...] = (RefResolutionError,)
+# Every unresolvable ``$ref`` surfaces as jsonschema's ``_WrappedReferencingError``,
+# which derives from ``referencing.exceptions.Unresolvable`` -- as do the wrapped
+# causes themselves (``Unresolvable``, ``PointerToNowhere``). That public base is
+# what jsonschema's own deprecation notice for ``RefResolutionError`` tells you to
+# catch, so use it directly rather than the private jsonschema name.
 
 # Keywords whose value is always a (sub)schema.
 _STRICT_SCHEMA_KEYWORDS = frozenset(
@@ -107,10 +103,10 @@ def _ok() -> dict[str, Any]:
 
 
 def _fail(
-    error_type: str,
-    error: str,
-    path: Any = None,
-    schema_path: Any = None,
+        error_type: str,
+        error: str,
+        path: Any = None,
+        schema_path: Any = None,
 ) -> dict[str, Any]:
     """Build the payload for a failed validation.
 
@@ -225,8 +221,8 @@ def resolve_draft(schema: dict[str, Any]) -> tuple[Any, str | None]:
 
     stripped = declared.strip()
     if not (
-        _JSON_SCHEMA_ORG_PATTERN.match(stripped)
-        or _BARE_DRAFT_PATTERN.match(stripped)
+            _JSON_SCHEMA_ORG_PATTERN.match(stripped)
+            or _BARE_DRAFT_PATTERN.match(stripped)
     ):
         # An unrelated URI that merely mentions a draft number (for example a
         # third-party mirror) is not a draft declaration we can trust.
@@ -330,9 +326,9 @@ def format_summary(result: dict[str, Any]) -> str:
 
 
 def validate_json_input(
-    json_input: Any,
-    schema_input: Any,
-    strict_mode: bool = False,
+        json_input: Any,
+        schema_input: Any,
+        strict_mode: bool = False,
 ) -> dict[str, Any]:
     """Validate ``json_input`` against ``schema_input``.
 
@@ -372,9 +368,9 @@ def validate_json_input(
 
 
 def _validate(
-    instance_text: str,
-    schema_text: str,
-    strict_mode: bool,
+        instance_text: str,
+        schema_text: str,
+        strict_mode: bool,
 ) -> dict[str, Any]:
     instance, instance_error = _loads(instance_text)
     if instance_error is not None:
@@ -420,7 +416,7 @@ def _validate(
         error = best_match(validator.iter_errors(instance))
     except ValidationError as validation_error:
         error = validation_error
-    except _REF_RESOLUTION_ERRORS as ref_error:
+    except Unresolvable as ref_error:
         return _fail(
             "ref_resolution_error",
             f"Schema $ref resolution failed: {ref_error}",
@@ -432,11 +428,13 @@ def _validate(
             schema_path=list(structural_error.absolute_schema_path),
         )
     except RecursionError:
-        # Recurrence through the data (a recursive schema over deeply nested
-        # JSON) exhausts the stack. The data is the thing to change.
+        # Either the data is genuinely too deep, or the schema loops on itself
+        # (``{"$ref": "#"}``) and never terminates. Both are input problems, and
+        # the message has to be honest about not knowing which one it was.
         return _fail(
             "internal_error",
-            "The JSON data or the schema is nested too deeply to be validated",
+            "Validation exceeded the interpreter recursion depth; the JSON may "
+            "be nested too deeply, or the schema may contain a circular $ref",
         )
     except Exception as unexpected:  # noqa: BLE001 - never raise
         return _fail(

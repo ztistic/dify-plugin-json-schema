@@ -61,7 +61,7 @@ CPython 默认递归上限 1000 下，可支持约 95 层深的 Schema；对自�
 | JSON 数据深到 `json.loads` 无法解析 | `invalid_json` |
 | JSON Schema 深到 `json.loads` 无法解析 | `invalid_schema_json` |
 | Schema 深到无法做元 Schema 校验 | `schema_error` |
-| 数据或 Schema 深到无法校验 | `internal_error` |
+| 数据或 Schema 深到无法校验，或 Schema 含循环 `$ref` | `internal_error` |
 
 ### 性能
 
