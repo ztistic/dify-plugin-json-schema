@@ -3,8 +3,11 @@
 This module intentionally contains no Dify runtime imports so that every
 branch can be unit tested directly, without booting the plugin SDK.
 
-The single entry point is :func:`validate_json_input`, which never raises:
-every failure mode is converted into a structured result dictionary.
+Internally, control flow is exception-driven: every classified failure is
+raised as a :class:`ValidationFailure` at the point where it is detected.
+The single entry point, :func:`validate_json_input`, is the boundary that
+converts those exceptions into structured result dictionaries -- it never
+raises.
 """
 
 from __future__ import annotations
@@ -63,6 +66,28 @@ _DRAFT_VERSION_PATTERN = re.compile(r"draft[-/](\d{4}-\d{2}|0?\d)", re.IGNORECAS
 # catch, so use it directly rather than the private jsonschema name.
 
 
+class ValidationFailure(Exception):
+    """A known, classified validation failure.
+
+    Raised at the point of detection and caught once by
+    :func:`validate_json_input`. Carries everything the failure payload
+    needs: the error type, the human-readable message, and both paths.
+    """
+
+    def __init__(
+            self,
+            error_type: str,
+            error: str,
+            path: Any = (),
+            schema_path: Any = (),
+    ) -> None:
+        super().__init__(error)
+        self.error_type = error_type
+        self.error = error
+        self.path = list(path)
+        self.schema_path = list(schema_path)
+
+
 def _ok() -> dict[str, Any]:
     """Build the payload for a successful validation."""
     return {"is_valid": True, "message": "Validation passed."}
@@ -88,76 +113,80 @@ def _fail(
     }
 
 
-def _stringify(value: Any) -> tuple[str | None, str | None]:
-    """Return ``(text, problem)`` where ``problem`` is None when usable.
+def _stringify(value: Any, parameter: str) -> str:
+    """Return ``value`` as JSON text.
 
-    ``problem`` is ``"empty"`` for missing/blank input and
-    ``"unrepresentable"`` for a value that cannot be turned into JSON text.
+    Raises :class:`ValidationFailure` (``invalid_input``) when the value is
+    missing, blank, or cannot be turned into JSON text.
     """
     if value is None:
-        return None, "empty"
+        raise ValidationFailure("invalid_input", f"{parameter} is empty")
     if isinstance(value, str):
-        return (value, None) if value.strip() else (None, "empty")
+        if value.strip():
+            return value
+        raise ValidationFailure("invalid_input", f"{parameter} is empty")
     try:
         text = json.dumps(value, ensure_ascii=False)
     except (TypeError, ValueError, RecursionError):
-        return None, "unrepresentable"
-    return (text, None) if text.strip() else (None, "empty")
+        raise ValidationFailure(
+            "invalid_input", f"{parameter} cannot be converted to a JSON string"
+        )
+    if text.strip():
+        return text
+    raise ValidationFailure("invalid_input", f"{parameter} is empty")
 
 
-def _input_problem_message(parameter: str, problem: str) -> str:
-    if problem == "empty":
-        return f"{parameter} is empty"
-    return f"{parameter} cannot be converted to a JSON string"
-
-
-def _loads(raw: str) -> tuple[Any, str | None]:
-    """Parse JSON text, returning ``(value, None)`` or ``(None, message)``.
+def _loads(raw: str, error_type: str, label: str) -> Any:
+    """Parse JSON text.
 
     Strictly ``json.loads`` and nothing else. The plugin validates, it does not
     prepare input: anything that is not already valid JSON -- including a
-    Markdown code fence around it -- is reported as ``invalid_json`` so the
-    caller fixes the value the downstream nodes will actually receive.
+    Markdown code fence around it -- is raised as :class:`ValidationFailure`
+    with ``error_type`` so the caller fixes the value the downstream nodes
+    will actually receive.
     """
     try:
-        return json.loads(raw), None
+        return json.loads(raw)
     except json.JSONDecodeError as error:
-        return None, _describe_decode_error(error)
+        raise ValidationFailure(error_type, f"{label}: {_describe_decode_error(error)}")
     except RecursionError:
         # json.loads recurses for every nesting level, so a pathologically
         # nested document exhausts the interpreter stack instead of raising a
         # JSONDecodeError. That must never escape as an uncaught exception.
-        return None, "the document is nested too deeply to be parsed"
+        raise ValidationFailure(
+            error_type, f"{label}: the document is nested too deeply to be parsed"
+        )
 
 
 def _describe_decode_error(error: json.JSONDecodeError) -> str:
     return f"{error.msg} at line {error.lineno} column {error.colno}"
 
 
-def resolve_draft(schema: dict[str, Any]) -> tuple[Any, str | None]:
+def resolve_draft(schema: dict[str, Any]) -> Any:
     """Pick the validator class for a schema.
 
-    Returns ``(validator_cls, None)`` when usable, or ``(None, message)`` when
-    the declared ``$schema`` points at an unsupported draft.
+    Returns the validator class, or raises :class:`ValidationFailure`
+    (``unsupported_draft``) when the declared ``$schema`` points at an
+    unsupported draft.
     """
     declared = schema.get("$schema")
     if declared is None:
-        return _DRAFT_VALIDATORS[DEFAULT_DRAFT_VERSION], None
+        return _DRAFT_VALIDATORS[DEFAULT_DRAFT_VERSION]
 
     if not isinstance(declared, str) or not declared.strip():
         # Not a usable identifier at all; fall through to the default draft so
         # that check_schema() reports the precise structural problem.
-        return _DRAFT_VALIDATORS[DEFAULT_DRAFT_VERSION], None
+        return _DRAFT_VALIDATORS[DEFAULT_DRAFT_VERSION]
 
     version = _draft_version(declared)
     if version is None:
         if _GENERIC_POINTER_PATTERN.search(declared.strip()):
-            return _DRAFT_VALIDATORS[DEFAULT_DRAFT_VERSION], None
-        return None, _unsupported_draft_message(declared)
+            return _DRAFT_VALIDATORS[DEFAULT_DRAFT_VERSION]
+        raise ValidationFailure("unsupported_draft", _unsupported_draft_message(declared))
 
     validator_cls = _DRAFT_VALIDATORS.get(version)
     if validator_cls is None:
-        return None, _unsupported_draft_message(declared)
+        raise ValidationFailure("unsupported_draft", _unsupported_draft_message(declared))
 
     stripped = declared.strip()
     if not (
@@ -166,8 +195,8 @@ def resolve_draft(schema: dict[str, Any]) -> tuple[Any, str | None]:
     ):
         # An unrelated URI that merely mentions a draft number (for example a
         # third-party mirror) is not a draft declaration we can trust.
-        return None, _unsupported_draft_message(declared)
-    return validator_cls, None
+        raise ValidationFailure("unsupported_draft", _unsupported_draft_message(declared))
+    return validator_cls
 
 
 def _draft_version(uri: str) -> str | None:
@@ -226,30 +255,26 @@ def validate_json_input(
     """Validate ``json_input`` against ``schema_input``.
 
     Returns either ``{"is_valid": True, "message": ...}`` or a failure payload
-    carrying ``error_type``, ``error``, ``path`` and ``schema_path``. This
-    function never raises.
+    carrying ``error_type``, ``error``, ``path`` and ``schema_path``. This is
+    the boundary that converts :class:`ValidationFailure` into the structured
+    result; it never raises.
 
     The schema is used exactly as given: the plugin validates, it does not
     rewrite the caller's intent. Anything beyond what the schema itself says --
     including rejecting undeclared properties -- is the schema author's call,
     expressed with ``additionalProperties: false`` where they want it.
     """
-    instance_text, instance_problem = _stringify(json_input)
-    if instance_problem is not None:
-        return _fail(
-            "invalid_input",
-            _input_problem_message("json_input", instance_problem),
-        )
-
-    schema_text, schema_problem = _stringify(schema_input)
-    if schema_problem is not None:
-        return _fail(
-            "invalid_input",
-            _input_problem_message("schema_input", schema_problem),
-        )
-
     try:
+        instance_text = _stringify(json_input, "json_input")
+        schema_text = _stringify(schema_input, "schema_input")
         return _validate(instance_text, schema_text)
+    except ValidationFailure as failure:
+        return _fail(
+            failure.error_type,
+            failure.error,
+            failure.path,
+            failure.schema_path,
+        )
     except RecursionError:
         # A final safety net: no interpreter-level failure may ever escape as
         # an uncaught exception out of a Dify tool.
@@ -269,39 +294,32 @@ def _validate(
         instance_text: str,
         schema_text: str,
 ) -> dict[str, Any]:
-    instance, instance_error = _loads(instance_text)
-    if instance_error is not None:
-        return _fail("invalid_json", f"Invalid JSON input: {instance_error}")
-
-    schema, schema_error = _loads(schema_text)
-    if schema_error is not None:
-        return _fail("invalid_schema_json", f"Invalid JSON Schema: {schema_error}")
+    instance = _loads(instance_text, "invalid_json", "Invalid JSON input")
+    schema = _loads(schema_text, "invalid_schema_json", "Invalid JSON Schema")
 
     if not isinstance(schema, (dict, bool)):
-        return _fail(
+        raise ValidationFailure(
             "schema_error",
             "Schema itself is invalid: a JSON Schema must be an object or a boolean.",
         )
 
     validator_cls = _DRAFT_VALIDATORS[DEFAULT_DRAFT_VERSION]
     if isinstance(schema, dict):
-        validator_cls, draft_error = resolve_draft(schema)
-        if draft_error is not None:
-            return _fail("unsupported_draft", draft_error)
+        validator_cls = resolve_draft(schema)
 
     try:
         validator_cls.check_schema(schema)
     except SchemaError as error:
-        return _fail(
+        raise ValidationFailure(
             "schema_error",
             f"Schema itself is invalid: {error.message}",
-            schema_path=list(error.absolute_schema_path),
+            schema_path=error.absolute_schema_path,
         )
     except RecursionError:
         # Metaschema validation burns ~10 frames per nesting level, so a schema
         # deeper than ~95 levels exhausts the default stack here. Such a schema
         # cannot be confirmed, and the schema is what has to change.
-        return _fail(
+        raise ValidationFailure(
             "schema_error",
             "Schema itself is invalid: the schema is nested too deeply to be checked",
         )
@@ -312,38 +330,32 @@ def _validate(
     except ValidationError as validation_error:
         error = validation_error
     except Unresolvable as ref_error:
-        return _fail(
+        raise ValidationFailure(
             "ref_resolution_error",
             f"Schema $ref resolution failed: {ref_error}",
         )
     except SchemaError as structural_error:
-        return _fail(
+        raise ValidationFailure(
             "schema_error",
             f"Schema itself is invalid: {structural_error.message}",
-            schema_path=list(structural_error.absolute_schema_path),
+            schema_path=structural_error.absolute_schema_path,
         )
     except RecursionError:
         # Either the data is genuinely too deep, or the schema loops on itself
         # (``{"$ref": "#"}``) and never terminates. Both are input problems, and
         # the message has to be honest about not knowing which one it was.
-        return _fail(
+        raise ValidationFailure(
             "internal_error",
             "Validation exceeded the interpreter recursion depth; the JSON may "
             "be nested too deeply, or the schema may contain a circular $ref",
-        )
-    except Exception as unexpected:  # noqa: BLE001 - never raise
-        return _fail(
-            "internal_error",
-            f"Unexpected error while validating: "
-            f"{type(unexpected).__name__}: {unexpected}",
         )
 
     if error is None:
         return _ok()
 
-    return _fail(
+    raise ValidationFailure(
         "validation_failed",
         error.message,
-        path=list(error.absolute_path),
-        schema_path=list(error.absolute_schema_path),
+        path=error.absolute_path,
+        schema_path=error.absolute_schema_path,
     )

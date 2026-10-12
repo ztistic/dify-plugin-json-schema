@@ -302,9 +302,8 @@ class TestDraftSupport:
         assert "Supported drafts:" in result["error"]
 
     def test_resolve_draft_returns_class_for_known(self):
-        validator_cls, error = resolve_draft({"$schema": "http://json-schema.org/draft-07/schema#"})
+        validator_cls = resolve_draft({"$schema": "http://json-schema.org/draft-07/schema#"})
         assert validator_cls is not None
-        assert error is None
 
 
 
