@@ -4,14 +4,14 @@ from typing import Any
 from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
 
-from utils.schema_utils import (
+from utils.failures import (
     ValidationFailure,
     format_summary,
     ok_result,
-    stringify_parameter,
     unexpected_failure_result,
-    validate_json_input,
 )
+from utils.schema_validation import validate_json_input
+from utils.strings import stringify_parameter
 
 
 class JsonSchemaValidatorTool(Tool):

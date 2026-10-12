@@ -4,16 +4,15 @@ import json
 
 import pytest
 
-from utils.schema_utils import (
+from utils.failures import (
     ValidationFailure,
     format_path,
     format_summary,
     ok_result,
-    resolve_draft,
-    stringify_parameter,
     unexpected_failure_result,
-    validate_json_input,
 )
+from utils.schema_validation import resolve_draft, validate_json_input
+from utils.strings import stringify_parameter
 
 PERSON_SCHEMA = json.dumps(
     {
