@@ -1,0 +1,58 @@
+identity:
+  name: json_schema_validator
+  author: eft
+  label:
+    en_US: JSON Schema Validator
+    zh_Hans: JSON Schema 校验器
+description:
+  human:
+    en_US: Validate a JSON string against a JSON Schema and return a typed result
+    zh_Hans: 校验 JSON 字符串是否符合指定的 JSON Schema，并返回带类型标记的结果
+  llm: "Validate a JSON string against a JSON Schema. Returns is_valid, error_type, error, path and schema_path. error_type is one of: invalid_input, invalid_json, invalid_schema_json, schema_error, unsupported_draft, ref_resolution_error, internal_error, validation_failed. Use this as a quality gate after an LLM node before consuming structured output downstream."
+parameters:
+  - name: json_input
+    type: string
+    required: true
+    label:
+      en_US: JSON Input
+      zh_Hans: JSON 数据
+    human_description:
+      en_US: The JSON string to validate, typically the output of an upstream LLM node
+      zh_Hans: 需要校验的 JSON 字符串，通常是上游 LLM 节点的输出
+    llm_description: The JSON data string to be validated. A single Markdown code fence around the JSON is tolerated.
+    form: llm
+  - name: schema_input
+    type: string
+    required: true
+    label:
+      en_US: JSON Schema
+      zh_Hans: JSON Schema
+    human_description:
+      en_US: The JSON Schema used to validate the input
+      zh_Hans: 用于校验输入的 JSON Schema
+    llm_description: The JSON Schema definition string. Draft 2020-12, 2019-09, 07, 06 and 04 are supported. Only inline $ref pointers can be resolved.
+    form: llm
+  - name: strict_mode
+    type: select
+    required: false
+    default: "false"
+    label:
+      en_US: Strict Mode
+      zh_Hans: 严格模式
+    human_description:
+      en_US: When enabled, properties not defined in the schema cause validation failure
+      zh_Hans: 开启后，Schema 中未定义的字段将导致校验失败
+    llm_description: Set to 'true' to reject any property that is not defined in the schema. Defaults to 'false'.
+    options:
+      - value: "true"
+        label:
+          en_US: "On"
+          zh_Hans: "开启"
+      - value: "false"
+        label:
+          en_US: "Off"
+          zh_Hans: "关闭"
+    form: form
+extra:
+  python:
+    source: tools/json_schema_validator.py

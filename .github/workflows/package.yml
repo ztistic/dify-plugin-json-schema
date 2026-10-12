@@ -1,0 +1,76 @@
+name: Package Plugin
+
+on:
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Dify Plugin CLI
+        run: |
+          curl -L -o /tmp/dify-plugin https://github.com/langgenius/dify-plugin-daemon/releases/latest/download/dify-plugin-linux-amd64
+          chmod +x /tmp/dify-plugin
+          /tmp/dify-plugin version
+
+      - name: Extract version
+        id: meta
+        run: |
+          VERSION=$(grep '^version:' manifest.yaml | awk '{print $2}')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Package plugin
+        run: |
+          /tmp/dify-plugin plugin package . -o "json-schema-${{ steps.meta.outputs.version }}.difypkg"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          path: "json-schema-${{ steps.meta.outputs.version }}.difypkg"
+          archive: false
+          if-no-files-found: error
+
+  validate:
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download package
+        uses: actions/download-artifact@v8
+        with:
+          name: "json-schema-${{ needs.package.outputs.version }}.difypkg"
+
+      - name: Setup marketplace validator
+        run: |
+          git clone --depth 1 https://github.com/langgenius/dify-marketplace-toolkit.git /tmp/dify-marketplace-toolkit
+          mkdir -p "$HOME/.local/bin"
+          curl -sL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o "$HOME/.local/bin/yq"
+          chmod +x "$HOME/.local/bin/yq"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          yq --version
+
+      - name: Validate package
+        run: |
+          python3 /tmp/dify-marketplace-toolkit/validator/validate-difypkg.py \
+            "json-schema-${{ needs.package.outputs.version }}.difypkg" \
+            --output-dir ./validation-report
+
+      - name: Upload validation summary
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          path: validation-report/summary.md
+          archive: false
+          if-no-files-found: ignore
+
+      - name: Upload validation report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: validation-report
+          path: validation-report
+          if-no-files-found: ignore

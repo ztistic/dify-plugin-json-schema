@@ -1,0 +1,43 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+wheels/
+
+# Environments
+.env
+.venv/
+env/
+venv/
+
+# Tests / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local validation output
+validation-report/
+
+# WorkBuddy workspace data
+.workbuddy/
+
+# IDEs
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dify CLI binary (in case it is downloaded into the project dir)
+dify-plugin
+dify-plugin.exe
+
+# Packaged plugin
+*.difypkg
