@@ -67,6 +67,11 @@ def unexpected_failure_result(escaped: BaseException) -> dict[str, Any]:
     )
 
 
+def error_fields(error_type: str, error: str) -> dict[str, Any]:
+    """The two fields every failure payload carries."""
+    return {"error_type": error_type, "error": error}
+
+
 def _fail(
         error_type: str,
         error: str,
@@ -80,8 +85,7 @@ def _fail(
     """
     return {
         "is_valid": False,
-        "error_type": error_type,
-        "error": error,
+        **error_fields(error_type, error),
         "path": list(path or []),
         "schema_path": list(schema_path or []),
     }

@@ -10,6 +10,7 @@ identity:
   icon: icon.svg
 tools:
   - tools/json_schema_validator.yaml
+  - tools/json_extractor.yaml
 extra:
   python:
     source: provider/json-schema.py

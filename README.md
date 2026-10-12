@@ -64,7 +64,8 @@ the *unwrapped* content is valid — while downstream still receives the fenced
 string and still fails to parse it. The verdict would say "passed" for a
 pipeline that stays broken.
 
-So if your source is an LLM answer, extract the JSON before validating it. The
+So if your source is an LLM answer, extract the JSON before validating it —
+the bundled JSON Extractor does this for whole-JSON and fenced answers. The
 `invalid_json` error carries the line and column, which is usually enough to
 tell that the problem is a fence or a stray sentence rather than the JSON
 itself.
@@ -140,6 +141,45 @@ Failure payload (all four fields are always present):
 No input can make the tool throw: every failure path returns a structured
 payload.
 
+## Tool: JSON Extractor
+
+LLMs often wrap structured output in prose or a Markdown code fence. The JSON
+Extractor pulls the first parseable JSON string out of a raw LLM answer so it
+can be fed into the validator. It is deterministic and rule-based — no model
+calls, no cleanup, no repair.
+
+### Parameters
+
+| Parameter    | Type   | Required | Description                                 |
+|--------------|--------|----------|---------------------------------------------|
+| `llm_output` | string | yes      | The raw answer text of an upstream LLM node |
+
+### What It Recognizes
+
+Two unambiguous shapes, tried in order; the first parseable candidate wins:
+
+1. the entire input already is JSON, returned as-is;
+2. a ```` ```json ```` or untagged fenced code block, whose content is
+   returned verbatim.
+
+Bare JSON embedded in prose is **not** extracted: scanning free text for
+balanced brackets cannot be done without guessing, and this plugin reports
+honestly instead of guessing. Fences tagged with another language
+(` ```python `, ` ```bash `, ...) are skipped. The extracted string is a
+verbatim slice of the input, never re-serialized, so number spellings and key
+order survive untouched.
+
+### Outputs
+
+| Field        | Type    | Description                                          |
+|--------------|---------|------------------------------------------------------|
+| `found`      | boolean | Whether a parseable JSON string was extracted        |
+| `json`       | string  | The extracted JSON text (present when found)         |
+| `error_type` | string  | Failure category (present when not found)            |
+| `error`      | string  | Human-readable explanation (present when not found)  |
+
+`error_type` is one of `invalid_input`, `no_json_found`, `internal_error`.
+
 ## Supported Drafts
 
 | Draft   | `$schema` URI                                  |
@@ -184,21 +224,23 @@ parser, the tool still answers with a structured error instead of crashing:
 
 ## Workflow Pattern
 
-Extract the JSON from the model's answer first, then place the validator
-between that step and the consumer, and branch on `is_valid`:
+Place the extractor right after the LLM node, the validator between the
+extractor and the consumer, and branch on both results:
 
 ```
-LLM node -> extract JSON -> JSON Schema Validator -> is_valid true  -> normal flow
-                                               -> is_valid false -> error_type branch
-                                                                            validation_failed -> retry with the error message
-                                                                            invalid_json      -> fix the extraction, then retry
-                                                                            schema_error      -> alert the workflow author
+LLM node -> JSON Extractor -> JSON Schema Validator -> is_valid true  -> normal flow
+             |                                         is_valid false -> error_type branch
+             |                                                                 validation_failed -> retry with the error message
+             |                                                                 invalid_json      -> alert (extracted text is not JSON)
+             |                                                                 schema_error      -> alert the workflow author
+             found false -> no_json_found: the model wrapped the JSON in prose
+                            the extractor refuses to guess at -> retry with a
+                            stricter prompt (demand a ```json block)
 ```
 
-The extraction step is yours, not the plugin's: the validator reports whether
-the string it was given is valid JSON, so a fenced answer has to be unwrapped
-before it reaches the gate. A Code node with a small regex, or an LLM call
-asked to return only the JSON, both do the job.
+The extractor only unwraps what the model wrapped; the validator decides
+whether the unwrapped text is structurally right. Splitting the two keeps each
+verdict honest about which step failed.
 
 Feeding `error`, `path` and `schema_path` back into the retry prompt lets the
 model fix precisely the field that broke.

@@ -1,0 +1,26 @@
+identity:
+  name: json_extractor
+  author: eft
+  label:
+    en_US: JSON Extractor
+    zh_Hans: JSON 提取器
+description:
+  human:
+    en_US: Extract the first parseable JSON string from raw LLM output
+    zh_Hans: 从大模型原始输出中提取第一段可解析的 JSON 字符串
+  llm: "Extract the first parseable JSON string from raw LLM output. Recognizes two shapes only: the whole text being JSON, or a ```json fenced code block. Bare JSON embedded in prose is not extracted. Returns found and json, or found=false with error_type (invalid_input, no_json_found, internal_error). Pipe the extracted json string into the JSON Schema Validator."
+parameters:
+  - name: llm_output
+    type: string
+    required: true
+    label:
+      en_US: LLM Output
+      zh_Hans: 大模型输出
+    human_description:
+      en_US: The raw answer text of an upstream LLM node
+      zh_Hans: 上游 LLM 节点的原始输出文本
+    llm_description: The raw LLM answer text to extract JSON from. If the model wrapped the JSON in a Markdown code block, the block content is returned verbatim; prose around bare JSON is not handled.
+    form: llm
+extra:
+  python:
+    source: tools/json_extractor.py
