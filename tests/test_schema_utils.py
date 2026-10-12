@@ -67,10 +67,6 @@ class TestValidationSuccess:
     def test_boolean_true_schema_passes(self):
         assert run('{"a": 1}', "true")["is_valid"] is True
 
-    def test_markdown_fence_is_tolerated(self):
-        fenced = '```json\n{"name": "Alice", "age": 30}\n```'
-        assert run(fenced, PERSON_SCHEMA)["is_valid"] is True
-
 
 class TestValidationFailure:
     def test_type_mismatch_reports_paths(self):
@@ -541,23 +537,45 @@ class TestInputRepresentability:
         assert "schema_input cannot be converted" in result["error"]
 
 
-class TestMarkdownFenceRecovery:
-    def test_prose_before_fence_is_tolerated(self):
-        fenced = 'Here you go:\n```json\n{"name": "Alice", "age": 30}\n```'
-        assert run(fenced, PERSON_SCHEMA)["is_valid"] is True
+class TestNoInputPreprocessing:
+    """The plugin validates; it does not prepare input.
 
-    def test_unterminated_fence_is_tolerated(self):
-        fenced = '```json\n{"name": "Alice", "age": 30}'
-        assert run(fenced, PERSON_SCHEMA)["is_valid"] is True
+    A Markdown-fenced string is not JSON, so it must be reported as
+    ``invalid_json`` rather than silently unwrapped. Unwrapping would make
+    ``is_valid`` describe a value the downstream nodes never receive, since the
+    tool does not emit the parsed JSON -- the caller's variable still holds the
+    fenced text.
+    """
 
-    def test_first_of_several_fences_is_used(self):
-        fenced = '```json\n{"name": "Alice", "age": 30}\n```\nand\n```\nother\n```'
-        assert run(fenced, PERSON_SCHEMA)["is_valid"] is True
+    @pytest.mark.parametrize(
+        "fenced",
+        [
+            '```json\n{"name": "Alice", "age": 30}\n```',
+            '```\n{"name": "Alice", "age": 30}\n```',
+            'Here is the result:\n```json\n{"name": "Alice", "age": 30}\n```',
+            '```json\n{"name": "Alice", "age": 30}',
+            '```json\n{"name": "Alice", "age": 30}\n```\nHope this helps',
+        ],
+    )
+    def test_fenced_json_is_rejected_as_invalid_json(self, fenced):
+        result = run(fenced, PERSON_SCHEMA)
+        assert result["is_valid"] is False
+        assert result["error_type"] == "invalid_json"
+        assert result["error"].startswith("Invalid JSON input:")
 
-    def test_broken_json_inside_fence_still_fails(self):
-        fenced = '```json\n{"name": "Alice",}\n```'
+    def test_fenced_json_with_valid_body_still_rejected(self):
+        # The body would pass validation if it were extracted; the point is
+        # that we must not extract it.
+        fenced = '```json\n{"name": "Alice", "age": 30}\n```'
         result = run(fenced, PERSON_SCHEMA)
         assert result["error_type"] == "invalid_json"
+
+    def test_broken_json_inside_fence_is_invalid_json(self):
+        fenced = '```json\n{"name": "Alice",}\n```'
+        assert run(fenced, PERSON_SCHEMA)["error_type"] == "invalid_json"
+
+    def test_clean_json_is_unaffected(self):
+        assert run('{"name": "Alice", "age": 30}', PERSON_SCHEMA)["is_valid"] is True
 
 
 class TestFormatting:

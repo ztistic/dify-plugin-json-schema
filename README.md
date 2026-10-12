@@ -44,10 +44,23 @@ endpoint, no network access.
 | `strict_mode`  | `select` | No       | `false` | `form` | Reject properties that the schema does not define  |
 
 If a parameter arrives already decoded as an object or an array, it is
-serialized back to JSON first. A single Markdown code fence around the JSON is
-tolerated, including a sentence in front of it, because that is how LLMs
-usually emit structured output; plain (invalid) fenced garbage is still
-reported as `invalid_json`.
+serialized back to JSON first.
+
+#### Input must already be clean JSON
+
+This plugin validates. It does **not** prepare input. `json_input` is passed
+straight to `json.loads`, and anything that is not already valid JSON is
+reported as `invalid_json` -- including a Markdown code fence around the JSON,
+which is how LLMs usually wrap structured output.
+
+That is deliberate. The tool emits only a validation verdict, never the parsed
+JSON, so the variable the downstream nodes receive is still the original string.
+Unwrapping a fence here would make `is_valid: true` describe a value nobody
+downstream ever sees, turning a broken pipeline into a passing check.
+
+So if your source is an LLM answer, extract the JSON before validating it. The
+`invalid_json` error carries the line and column, which is usually enough to see
+that the problem is a fence or a stray sentence rather than the JSON itself.
 
 ### Nesting depth
 
@@ -112,7 +125,7 @@ Failure payload (all four fields are always present):
 | `error_type`            | Meaning                                             | Suggested reaction                     |
 |-------------------------|-----------------------------------------------------|----------------------------------------|
 | `invalid_input`         | `json_input` or `schema_input` is empty             | Fix the node wiring                    |
-| `invalid_json`          | The data is not valid JSON                          | Ask the model to re-emit, or retry     |
+| `invalid_json`          | The data is not valid JSON (fences included)       | Fix the extraction, then retry         |
 | `invalid_schema_json`   | The schema is not valid JSON                        | Fix the schema text                    |
 | `schema_error`          | Valid JSON, but not a valid JSON Schema             | Fix the schema structure               |
 | `unsupported_draft`     | `$schema` points at an unsupported draft            | Switch to a supported draft            |
@@ -155,16 +168,21 @@ subschema is treated as an object when its `type` is `"object"` or includes it
 
 ## Workflow Pattern
 
-Place the validator between the LLM node and the consumer, then branch on
-`is_valid`:
+Extract the JSON from the model's answer first, then place the validator
+between that step and the consumer, and branch on `is_valid`:
 
 ```
-LLM node -> JSON Schema Validator -> is_valid true  -> normal flow
-                                  -> is_valid false -> error_type branch
-                                                       validation_failed   -> retry with the error message
-                                                       invalid_json        -> retry with stricter instructions
-                                                       schema_error        -> alert the workflow author
+LLM node -> extract JSON -> JSON Schema Validator -> is_valid true  -> normal flow
+                                               -> is_valid false -> error_type branch
+                                                                            validation_failed -> retry with the error message
+                                                                            invalid_json      -> fix the extraction, then retry
+                                                                            schema_error      -> alert the workflow author
 ```
+
+The extraction step is yours, not the plugin's: the validator reports whether the
+string it was given is valid JSON, so a fenced answer has to be unwrapped before
+it reaches the gate. A Code node with a small regex, or an LLM call asked to
+return only the JSON, both do the job.
 
 Feeding `error`, `path` and `schema_path` back into the retry prompt lets the
 model fix precisely the field that broke.

@@ -145,44 +145,18 @@ def _input_problem_message(parameter: str, problem: str) -> str:
     return f"{parameter} cannot be converted to a JSON string"
 
 
-def _extract_json_text(raw: str) -> str | None:
-    """Recover JSON text from a Markdown code fence, if present.
-
-    LLMs frequently wrap their structured output in ```json fences, often with
-    a sentence in front of it. The strict parse stays authoritative: only when
-    it fails do we try to unwrap the first fence, so genuinely broken JSON is
-    still reported as ``invalid_json``.
-    """
-    lines = raw.splitlines()
-    start = None
-    for index, line in enumerate(lines):
-        if line.strip().startswith("```"):
-            start = index + 1
-            break
-    if start is None:
-        return None
-
-    body: list[str] = []
-    for line in lines[start:]:
-        if line.strip().startswith("```"):
-            break
-        body.append(line)
-    candidate = "\n".join(body).strip()
-    return candidate or None
-
-
 def _loads(raw: str) -> tuple[Any, str | None]:
-    """Parse JSON text, returning ``(value, None)`` or ``(None, message)``."""
+    """Parse JSON text, returning ``(value, None)`` or ``(None, message)``.
+
+    Strictly ``json.loads`` and nothing else. The plugin validates, it does not
+    prepare input: anything that is not already valid JSON -- including a
+    Markdown code fence around it -- is reported as ``invalid_json`` so the
+    caller fixes the value the downstream nodes will actually receive.
+    """
     try:
         return json.loads(raw), None
-    except json.JSONDecodeError as first_error:
-        recovered = _extract_json_text(raw)
-        if recovered is None:
-            return None, _describe_decode_error(first_error)
-        try:
-            return json.loads(recovered), None
-        except json.JSONDecodeError as second_error:
-            return None, _describe_decode_error(second_error)
+    except json.JSONDecodeError as error:
+        return None, _describe_decode_error(error)
     except RecursionError:
         # json.loads recurses for every nesting level, so a pathologically
         # nested document exhausts the interpreter stack instead of raising a

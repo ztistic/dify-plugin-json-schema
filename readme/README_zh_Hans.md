@@ -39,9 +39,20 @@ Dify 的 LLM 节点虽然可以用 JSON Schema 引导输出，但**并不保证�
 | `schema_input` | `string` | 是 | - | `llm` | 用于校验的 JSON Schema 字符串 |
 | `strict_mode` | `select` | 否 | `false` | `form` | 开启后拒绝 Schema 未定义的字段 |
 
-参数若已经是对象/数组结构，会先序列化回 JSON；允许 JSON 外面包一层 Markdown
-代码围栏（LLM 常见输出习惯，围栏前带一句自然语言也可以），但纯非法输入仍会报
-`invalid_json`。
+参数若已经是对象/数组结构，会先序列化回 JSON。
+
+#### 入参必须是干净的 JSON
+
+本插件只做校验，**不处理入参**。`json_input` 直接交给 `json.loads`，任何本身不是
+合法 JSON 的输入都会报 `invalid_json`——包括 JSON 外面包一层 Markdown 代码围栏
+（这正是 LLM 包裹结构化输出的常见方式）。
+
+这是刻意的。工具只输出校验结论，从不回吐解析后的 JSON，所以下游节点拿到的变量仍然
+是那个原始字符串。如果在这里替用户拆围栏，`is_valid: true` 描述的就是一个下游根本
+看不到的值，等于把一条坏流水管包装成"校验通过"。
+
+因此，如果数据源是 LLM 的回答，请先自行提取 JSON 再送进来校验。`invalid_json` 的
+错误信息带行号列号，通常足以判断问题出在围栏或多余的一句话上，而不是 JSON 本身。
 
 ### 嵌套深度
 
@@ -115,7 +126,7 @@ CPython 默认递归上限 1000 下，可支持约 95 层深的 Schema；对自�
 | `error_type` | 含义 | 建议动作 |
 |---|---|---|
 | `invalid_input` | `json_input` 或 `schema_input` 为空 | 检查节点接线 |
-| `invalid_json` | 数据不是合法 JSON | 让模型重新输出，或重试 |
+| `invalid_json` | 数据不是合法 JSON（含带围栏的） | 修好提取步骤，或重试 |
 | `invalid_schema_json` | Schema 不是合法 JSON | 修正 Schema 文本 |
 | `schema_error` | 是合法 JSON，但不是合法 Schema | 修正 Schema 结构 |
 | `unsupported_draft` | `$schema` 声明了不支持的 Draft | 换成支持的 Draft |
@@ -154,13 +165,19 @@ Schema 加上 `additionalProperties: false`，从而拒绝未定义字段。遍�
 
 ## 工作流用法
 
+先把 JSON 从模型回答里提取出来，再把校验器放在这一步和消费端之间，按 `is_valid` 分支：
+
 ```
-LLM 节点 -> JSON Schema 校验 -> is_valid true  -> 正常流程
-                             -> is_valid false -> 按 error_type 分支
-                                                  validation_failed -> 带上错误信息重试
-                                                  invalid_json      -> 加强提示词后重试
-                                                  schema_error      -> 告警给流程作者
+LLM 节点 -> 提取 JSON -> JSON Schema 校验 -> is_valid true  -> 正常流程
+                                      -> is_valid false -> 按 error_type 分支
+                                                          validation_failed -> 带上错误信息重试
+                                                          invalid_json      -> 修好提取步骤再重试
+                                                          schema_error      -> 告警给流程作者
 ```
+
+提取这一步归使用者，不归插件：校验器只判断"交给它的这个字符串是不是合法 JSON"，
+所以带围栏的回答必须在进校验之前先拆开。用一个 Code 节点写个正则，或者再调一次
+LLM 让它只输出 JSON，都可以。
 
 把 `error`、`path`、`schema_path` 回填到重试提示词中，模型即可精确修掉出错的字段。
 
