@@ -201,6 +201,11 @@ dify-plugin-json-schema/
 └── _assets/icon.svg                 # 插件图标
 ```
 
+## 图标
+
+插件图标采用 JSON Schema 官方 Logo（<https://json-schema.org/logo-blue.svg>），
+在浅色背景上居中放置。
+
 ## 许可证
 
 [MIT](../LICENSE)

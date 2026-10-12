@@ -225,6 +225,11 @@ dify-plugin-json-schema/
 └── _assets/icon.svg                 # Plugin icon
 ```
 
+## Icon
+
+The plugin icon is the official JSON Schema logo
+(<https://json-schema.org/logo-blue.svg>), centred on a light background.
+
 ## License
 
 [MIT](./LICENSE)
