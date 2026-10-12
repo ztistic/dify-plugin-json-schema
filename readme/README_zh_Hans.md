@@ -33,11 +33,10 @@ Dify 的 LLM 节点虽然可以用 JSON Schema 引导输出，但**并不保证�
 
 ## 工具：JSON Schema Validator
 
-| 参数 | 类型 | 必填 | 默认值 | 形式 | 说明 |
-|---|---|---|---|---|---|
-| `json_input` | `string` | 是 | - | `llm` | 需要校验的 JSON 字符串 |
-| `schema_input` | `string` | 是 | - | `llm` | 用于校验的 JSON Schema 字符串 |
-| `strict_mode` | `select` | 否 | `false` | `form` | 开启后拒绝 Schema 未定义的字段 |
+| 参数 | 类型 | 必填 | 形式 | 说明 |
+|---|---|---|---|---|
+| `json_input` | `string` | 是 | `llm` | 需要校验的 JSON 字符串 |
+| `schema_input` | `string` | 是 | `llm` | 用于校验的 JSON Schema 字符串 |
 
 参数若已经是对象/数组结构，会先序列化回 JSON。
 
@@ -87,7 +86,7 @@ CPython 默认递归上限 1000 下，可支持约 95 层深的 Schema；对自�
 | 1 MB | ~160 ms |
 
 其中约 95% 的时间花在 `jsonschema` 自身遍历文档上，这是纯 Python 校验库的固有代价，
-也是当初选型时接受的权衡。严格模式因需要先深拷贝 Schema，约增加 10% 耗时。
+也是当初选型时接受的权衡。
 
 ### 输出
 
@@ -152,16 +151,29 @@ Draft 2020-12 处理。Draft 3 及未知 URI 返回 `unsupported_draft`。
 仅支持**内联** `$ref`（例如 `#/$defs/Address`）；远端引用不会被联网拉取，而是返回
 `ref_resolution_error`。
 
-## 严格模式
+## Schema 按原样生效
 
-开启 `strict_mode` 后，插件会遍历 Schema，为所有**尚未约束额外字段**的 object 子
-Schema 加上 `additionalProperties: false`，从而拒绝未定义字段。遍历覆盖
-`properties`、`patternProperties`、`$defs`、`definitions`、`dependentSchemas`、
-`items`、`prefixItems`、`allOf`、`anyOf`、`oneOf`、`not`、`if`/`then`/`else`、
-`contains`、`propertyNames` 以及 Draft-07 的 `dependencies`。子 Schema 在以下情况
-按对象处理：`type` 为 `"object"`、`type` 数组中包含 `"object"`（例如
-`["object", "null"]` 这种可空对象）、或写了 `properties`/`required` 但没写 `type`。
-原始 Schema 不会被修改。
+插件**从不改写你的 Schema**。Schema 写了什么就校验什么，不多也不少。没有所谓的
+"严格模式"全局开关——因为 JSON Schema 本身也没有这个概念：拒绝未定义字段的唯一方式
+就是逐对象声明 `additionalProperties: false`。
+
+这是刻意的。一个把每个对象都关上的开关，会覆盖你已经做好的精细化选择——"关掉这个对象、
+放开那个对象"是合理且精确的决策，一刀切的开关会把它毁掉。它还会以不直观的方式改变语义：
+把 `anyOf` 的两个分支都关上，`{"a": 1, "b": 2}` 就会在两个分支里都失败，而它本来可以
+分别满足两者。
+
+所以约束写在需要的地方：
+
+```json
+{
+  "type": "object",
+  "properties": { "name": { "type": "string" } },
+  "additionalProperties": false
+}
+```
+
+`additionalProperties` 只作用于没有被 `properties` 或 `patternProperties`覆盖的属性，
+所以关上的对象依然接受 Schema 声明过的全部字段。
 
 ## 工作流用法
 

@@ -30,29 +30,8 @@ parameters:
     human_description:
       en_US: The JSON Schema used to validate the input
       zh_Hans: 用于校验输入的 JSON Schema
-    llm_description: The JSON Schema definition string. Draft 2020-12, 2019-09, 07, 06 and 04 are supported. Only inline $ref pointers can be resolved.
+    llm_description: "The JSON Schema definition string. Draft 2020-12, 2019-09, 07, 06 and 04 are supported. Only inline $ref pointers can be resolved. The schema is applied exactly as written -- to reject undeclared properties, declare additionalProperties: false yourself."
     form: llm
-  - name: strict_mode
-    type: select
-    required: false
-    default: "false"
-    label:
-      en_US: Strict Mode
-      zh_Hans: 严格模式
-    human_description:
-      en_US: When enabled, properties not defined in the schema cause validation failure
-      zh_Hans: 开启后，Schema 中未定义的字段将导致校验失败
-    llm_description: Set to 'true' to reject any property that is not defined in the schema. Defaults to 'false'.
-    options:
-      - value: "true"
-        label:
-          en_US: "On"
-          zh_Hans: "开启"
-      - value: "false"
-        label:
-          en_US: "Off"
-          zh_Hans: "关闭"
-    form: form
 extra:
   python:
     source: tools/json_schema_validator.py

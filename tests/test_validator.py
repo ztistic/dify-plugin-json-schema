@@ -69,32 +69,6 @@ class TestToolMessages:
         assert "invalid_input" in text_of(messages)
 
 
-class TestStrictModeParameter:
-    @pytest.mark.parametrize(
-        "value",
-        ["true", "TRUE", " True ", True, 1, 1.0],
-    )
-    def test_truthy_values_enable_strict_mode(self, value):
-        schema = json.dumps({"type": "object", "properties": {"a": {"type": "string"}}})
-        messages = invoke(
-            json_input='{"a": "x", "b": 1}', schema_input=schema, strict_mode=value
-        )
-        assert json_of(messages)["error_type"] == "validation_failed"
-
-    @pytest.mark.parametrize("value", ["false", "off", False, 0, None, "nope"])
-    def test_other_values_keep_strict_mode_off(self, value):
-        schema = json.dumps({"type": "object", "properties": {"a": {"type": "string"}}})
-        messages = invoke(
-            json_input='{"a": "x", "b": 1}', schema_input=schema, strict_mode=value
-        )
-        assert json_of(messages)["is_valid"] is True
-
-    def test_strict_mode_parameter_absent(self):
-        schema = json.dumps({"type": "object", "properties": {"a": {"type": "string"}}})
-        messages = invoke(json_input='{"a": "x", "b": 1}', schema_input=schema)
-        assert json_of(messages)["is_valid"] is True
-
-
 class TestSyntaxErrorMessages:
     def test_invalid_json(self):
         messages = invoke(json_input='{"a": }', schema_input=PERSON_SCHEMA)

@@ -37,11 +37,10 @@ endpoint, no network access.
 
 ### JSON Schema Validator
 
-| Parameter      | Type     | Required | Default | Form   | Description                                        |
-|----------------|----------|----------|---------|--------|----------------------------------------------------|
-| `json_input`   | `string` | Yes      | -       | `llm`  | The JSON string to validate                        |
-| `schema_input` | `string` | Yes      | -       | `llm`  | The JSON Schema to validate against                |
-| `strict_mode`  | `select` | No       | `false` | `form` | Reject properties that the schema does not define  |
+| Parameter      | Type     | Required | Form   | Description                                 |
+|----------------|----------|----------|--------|---------------------------------------------|
+| `json_input`   | `string` | Yes      | `llm`  | The JSON string to validate                 |
+| `schema_input` | `string` | Yes      | `llm`  | The JSON Schema to validate against         |
 
 If a parameter arrives already decoded as an object or an array, it is
 serialized back to JSON first.
@@ -154,17 +153,32 @@ Only **inline** `$ref` pointers (for example `#/$defs/Address`) can be
 resolved; remote references return `ref_resolution_error` instead of being
 fetched over the network.
 
-## Strict Mode
+## The Schema Is Applied Exactly As Written
 
-With `strict_mode` enabled, the plugin walks the schema and adds
-`additionalProperties: false` to every object subschema that does not already
-control extra keys, so unexpected fields are rejected. The walk covers
-`properties`, `patternProperties`, `$defs`, `definitions`,
-`dependentSchemas`, `items`, `prefixItems`, `allOf`, `anyOf`, `oneOf`, `not`,
-`if`/`then`/`else`, `contains`, `propertyNames` and Draft-07 `dependencies`. A
-subschema is treated as an object when its `type` is `"object"` or includes it
-(for example `["object", "null"]`), or when it declares `properties` or
-`required` without an explicit `type`. The original schema is never mutated.
+This plugin never rewrites your schema. Whatever it says is what gets enforced,
+nothing more and nothing less. There is no global "strict mode" toggle, because
+JSON Schema has no such concept either: the only way to reject undeclared
+properties is `additionalProperties: false`, declared per object.
+
+That is deliberate. A single switch that closed every object would override the
+granular choices you already made -- closing one object and leaving another open
+is a legitimate, precise decision, and a blanket toggle would destroy it. It
+would also change semantics in non-obvious ways: closing both branches of an
+`anyOf` makes `{"a": 1, "b": 2}` fail both, where it used to satisfy each.
+
+So write the constraint where you want it:
+
+```json
+{
+  "type": "object",
+  "properties": { "name": { "type": "string" } },
+  "additionalProperties": false
+}
+```
+
+`additionalProperties` applies to properties not matched by `properties` or
+`patternProperties`, so a closed object still accepts everything the schema
+declares.
 
 ## Workflow Pattern
 
@@ -208,8 +222,7 @@ objects), on Python 3.12, single invocation:
 
 Roughly 95% of that time is spent inside `jsonschema` itself traversing the
 document, which is inherent to a pure-Python validator and was the accepted
-trade-off of the library choice. Strict mode adds roughly 10% because the
-schema is deep-copied before validation.
+trade-off of the library choice.
 
 ## Development
 

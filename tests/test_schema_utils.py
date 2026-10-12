@@ -5,7 +5,6 @@ import json
 import pytest
 
 from utils.schema_utils import (
-    apply_strict_mode,
     format_path,
     format_summary,
     resolve_draft,
@@ -28,8 +27,8 @@ PERSON_SCHEMA = json.dumps(
 PERSON_JSON = json.dumps({"name": "Alice", "age": 30, "tags": ["admin"]})
 
 
-def run(json_input, schema_input, strict_mode=False):
-    return validate_json_input(json_input, schema_input, strict_mode=strict_mode)
+def run(json_input, schema_input):
+    return validate_json_input(json_input, schema_input)
 
 
 class TestValidationSuccess:
@@ -308,100 +307,6 @@ class TestDraftSupport:
         assert error is None
 
 
-class TestStrictMode:
-    def test_extra_property_rejected(self):
-        result = run(
-            json.dumps({"name": "Alice", "age": 30, "extra": 1}),
-            PERSON_SCHEMA,
-            strict_mode=True,
-        )
-        assert result["error_type"] == "validation_failed"
-        assert "Additional properties are not allowed" in result["error"]
-        assert "'extra'" in result["error"]
-        assert result["schema_path"] == ["additionalProperties"]
-
-    def test_extra_property_allowed_when_disabled(self):
-        result = run(
-            json.dumps({"name": "Alice", "age": 30, "extra": 1}),
-            PERSON_SCHEMA,
-            strict_mode=False,
-        )
-        assert result["is_valid"] is True
-
-    def test_original_schema_is_not_mutated(self):
-        schema = {"type": "object", "properties": {"a": {"type": "object"}}}
-        strict = apply_strict_mode(schema)
-        assert strict["additionalProperties"] is False
-        assert "additionalProperties" not in schema
-
-    def test_nested_objects_are_closed_recursively(self):
-        schema = {
-            "type": "object",
-            "properties": {
-                "user": {
-                    "type": "object",
-                    "properties": {"name": {"type": "string"}},
-                }
-            },
-        }
-        strict = apply_strict_mode(schema)
-        assert strict["properties"]["user"]["additionalProperties"] is False
-
-    def test_defs_are_closed_recursively(self):
-        schema = {
-            "type": "object",
-            "properties": {"pet": {"$ref": "#/$defs/Pet"}},
-            "$defs": {"Pet": {"type": "object", "properties": {"kind": {"type": "string"}}}},
-        }
-        strict = apply_strict_mode(schema)
-        assert strict["$defs"]["Pet"]["additionalProperties"] is False
-
-    def test_items_and_composition_keywords_are_closed(self):
-        schema = {
-            "type": "array",
-            "items": {"type": "object", "properties": {"a": {"type": "string"}}},
-        }
-        assert apply_strict_mode(schema)["items"]["additionalProperties"] is False
-
-        composed = {"allOf": [{"type": "object", "properties": {"a": {}}}]}
-        assert apply_strict_mode(composed)["allOf"][0]["additionalProperties"] is False
-
-    def test_nullable_object_type_is_closed(self):
-        schema = {"type": ["object", "null"], "properties": {"a": {"type": "string"}}}
-        assert apply_strict_mode(schema)["additionalProperties"] is False
-
-    def test_nullable_non_object_type_is_not_closed(self):
-        schema = {"type": ["string", "null"]}
-        assert "additionalProperties" not in apply_strict_mode(schema)
-
-    def test_nullable_object_validates_in_strict_mode(self):
-        schema = json.dumps(
-            {"type": ["object", "null"], "properties": {"a": {"type": "string"}}}
-        )
-        assert run("null", schema, strict_mode=True)["is_valid"] is True
-        result = run('{"a": "x", "b": 1}', schema, strict_mode=True)
-        assert result["error_type"] == "validation_failed"
-
-    def test_object_without_type_but_with_properties_is_closed(self):
-        schema = {"properties": {"a": {"type": "string"}}}
-        assert apply_strict_mode(schema)["additionalProperties"] is False
-
-    def test_existing_additional_properties_is_preserved(self):
-        schema = {"type": "object", "additionalProperties": {"type": "string"}}
-        assert apply_strict_mode(schema)["additionalProperties"] == {"type": "string"}
-
-    def test_boolean_subschema_is_preserved(self):
-        assert apply_strict_mode(True) is True
-        assert apply_strict_mode({"additionalProperties": True}) == {
-            "additionalProperties": True
-        }
-
-    def test_draft7_dependencies_map_is_handled(self):
-        schema = {"dependencies": {"a": ["b"], "c": {"type": "object"}}}
-        strict = apply_strict_mode(schema)
-        assert strict["dependencies"]["a"] == ["b"]
-        assert strict["dependencies"]["c"]["additionalProperties"] is False
-
 
 class TestNeverRaises:
     @pytest.mark.parametrize(
@@ -472,14 +377,6 @@ class TestDeepNesting:
     def test_recursive_schema_over_deep_data_validates(self):
         # Data follows a recursive schema; depth is bounded by both.
         assert run(self._nested_data_text(50), self.RECURSIVE_SCHEMA)["is_valid"] is True
-
-    def test_recursive_schema_in_strict_mode(self):
-        assert (
-            run(self._nested_data_text(50), self.RECURSIVE_SCHEMA, strict_mode=True)[
-                "is_valid"
-            ]
-            is True
-        )
 
     def test_deeply_nested_json_is_reported_not_raised(self):
         result = run("[" * 20000 + "]" * 20000, '{"type": "array"}')

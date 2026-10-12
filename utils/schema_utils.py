@@ -9,7 +9,6 @@ every failure mode is converted into a structured result dictionary.
 
 from __future__ import annotations
 
-import copy
 import json
 import re
 from typing import Any
@@ -62,39 +61,6 @@ _DRAFT_VERSION_PATTERN = re.compile(r"draft[-/](\d{4}-\d{2}|0?\d)", re.IGNORECAS
 # causes themselves (``Unresolvable``, ``PointerToNowhere``). That public base is
 # what jsonschema's own deprecation notice for ``RefResolutionError`` tells you to
 # catch, so use it directly rather than the private jsonschema name.
-
-# Keywords whose value is always a (sub)schema.
-_STRICT_SCHEMA_KEYWORDS = frozenset(
-    {
-        "additionalProperties",
-        "additionalItems",
-        "contains",
-        "else",
-        "if",
-        "items",
-        "not",
-        "propertyNames",
-        "then",
-        "unevaluatedItems",
-        "unevaluatedProperties",
-    }
-)
-
-# Keywords whose value is a list of (sub)schemas.
-_STRICT_SCHEMA_LIST_KEYWORDS = frozenset(
-    {"allOf", "anyOf", "items", "oneOf", "prefixItems"}
-)
-
-# Keywords whose value maps a name onto a (sub)schema.
-_STRICT_SCHEMA_MAP_KEYWORDS = frozenset(
-    {
-        "$defs",
-        "definitions",
-        "dependentSchemas",
-        "patternProperties",
-        "properties",
-    }
-)
 
 
 def _ok() -> dict[str, Any]:
@@ -219,52 +185,6 @@ def _unsupported_draft_message(declared: str) -> str:
     )
 
 
-def apply_strict_mode(schema: Any) -> Any:
-    """Return a copy of ``schema`` with every object closed for extra keys.
-
-    For each object-typed subschema that does not already declare
-    ``additionalProperties``, a single ``additionalProperties: false`` is added.
-    A subschema that declares ``properties`` or ``required`` but omits ``type``
-    is treated as an object too, because that is how such schemas behave.
-    """
-    if isinstance(schema, bool) or not isinstance(schema, dict):
-        return copy.deepcopy(schema)
-
-    result: dict[str, Any] = {}
-    for key, value in schema.items():
-        if key in _STRICT_SCHEMA_LIST_KEYWORDS and isinstance(value, list):
-            result[key] = [apply_strict_mode(item) for item in value]
-        elif key in _STRICT_SCHEMA_MAP_KEYWORDS and isinstance(value, dict):
-            result[key] = {
-                name: apply_strict_mode(sub) for name, sub in value.items()
-            }
-        elif key == "dependencies" and isinstance(value, dict):
-            # Draft-07: values are either arrays of names or subschemas.
-            result[key] = {
-                name: apply_strict_mode(sub) if isinstance(sub, dict) else sub
-                for name, sub in value.items()
-            }
-        elif key in _STRICT_SCHEMA_KEYWORDS:
-            result[key] = apply_strict_mode(value)
-        else:
-            result[key] = copy.deepcopy(value)
-
-    if "additionalProperties" not in result and _looks_like_object(result):
-        result["additionalProperties"] = False
-    return result
-
-
-def _looks_like_object(subschema: dict[str, Any]) -> bool:
-    declared = subschema.get("type")
-    if isinstance(declared, list):
-        # ``{"type": ["object", "null"]}`` is a very common way to express a
-        # nullable object, and it must still be closed in strict mode.
-        return "object" in declared
-    if declared is not None:
-        return declared == "object"
-    return "properties" in subschema or "required" in subschema
-
-
 # Deliberately NOT raising CPython's recursion limit. ``jsonschema`` validates a
 # schema against its metaschema in pure Python and burns roughly ten interpreter
 # frames per nesting level, so the default limit of 1000 admits schemas up to
@@ -302,13 +222,17 @@ def format_summary(result: dict[str, Any]) -> str:
 def validate_json_input(
         json_input: Any,
         schema_input: Any,
-        strict_mode: bool = False,
 ) -> dict[str, Any]:
     """Validate ``json_input`` against ``schema_input``.
 
     Returns either ``{"is_valid": True, "message": ...}`` or a failure payload
     carrying ``error_type``, ``error``, ``path`` and ``schema_path``. This
     function never raises.
+
+    The schema is used exactly as given: the plugin validates, it does not
+    rewrite the caller's intent. Anything beyond what the schema itself says --
+    including rejecting undeclared properties -- is the schema author's call,
+    expressed with ``additionalProperties: false`` where they want it.
     """
     instance_text, instance_problem = _stringify(json_input)
     if instance_problem is not None:
@@ -325,7 +249,7 @@ def validate_json_input(
         )
 
     try:
-        return _validate(instance_text, schema_text, strict_mode)
+        return _validate(instance_text, schema_text)
     except RecursionError:
         # A final safety net: no interpreter-level failure may ever escape as
         # an uncaught exception out of a Dify tool.
@@ -344,7 +268,6 @@ def validate_json_input(
 def _validate(
         instance_text: str,
         schema_text: str,
-        strict_mode: bool,
 ) -> dict[str, Any]:
     instance, instance_error = _loads(instance_text)
     if instance_error is not None:
@@ -366,10 +289,8 @@ def _validate(
         if draft_error is not None:
             return _fail("unsupported_draft", draft_error)
 
-    effective_schema = apply_strict_mode(schema) if strict_mode else schema
-
     try:
-        validator_cls.check_schema(effective_schema)
+        validator_cls.check_schema(schema)
     except SchemaError as error:
         return _fail(
             "schema_error",
@@ -385,7 +306,7 @@ def _validate(
             "Schema itself is invalid: the schema is nested too deeply to be checked",
         )
 
-    validator = validator_cls(effective_schema)
+    validator = validator_cls(schema)
     try:
         error = best_match(validator.iter_errors(instance))
     except ValidationError as validation_error:
