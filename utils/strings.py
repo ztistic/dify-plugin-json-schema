@@ -18,12 +18,12 @@ def is_blank(value: str | None) -> bool:
     return not trim_to_empty(value)
 
 
-def _stringify(value: Any) -> str:
+def stringify(value: Any) -> str:
     """Return ``value`` as JSON text.
 
     Raises :class:`ValidationFailure` (``invalid_input``) carrying only the
     reason (for example ``"is empty"``) -- which parameter was being converted
-    is the caller's knowledge, see :func:`stringify_parameter`.
+    is the caller's knowledge, see :func:`get_string`.
     """
     if value is None:
         raise ValidationFailure("invalid_input", "is empty")
@@ -41,15 +41,15 @@ def _stringify(value: Any) -> str:
     return text
 
 
-def stringify_parameter(value: Any, parameter: str) -> str:
-    """Like :func:`_stringify`, but attributes a failure to ``parameter``.
+def get_string(obj: dict[str, Any], key: str) -> str:
+    """Return ``obj[key]`` as JSON text, attributing a failure to ``key``.
 
     Turns the bare reason into a message that names the offending input, for
     example ``"json_input is empty"``.
     """
     try:
-        return _stringify(value)
+        return stringify(obj.get(key))
     except ValidationFailure as failure:
         raise ValidationFailure(
-            failure.error_type, f"{parameter} {failure.error}"
+            failure.error_type, f"{key} {failure.error}"
         )

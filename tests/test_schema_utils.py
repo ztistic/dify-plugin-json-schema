@@ -12,7 +12,7 @@ from utils.failures import (
     unexpected_failure_result,
 )
 from utils.schema_validation import resolve_draft, validate_json_input
-from utils.strings import stringify_parameter
+from utils.strings import get_string
 
 PERSON_SCHEMA = json.dumps(
     {
@@ -34,10 +34,11 @@ def run(json_input, schema_input):
     # Mirror the tool boundary: adapt raw parameter values first, then call
     # the strict strings-only validator, and convert every escape into the
     # structured payload.
+    parameters = {"json_input": json_input, "schema_input": schema_input}
     try:
         validate_json_input(
-            stringify_parameter(json_input, "json_input"),
-            stringify_parameter(schema_input, "schema_input"),
+            get_string(parameters, "json_input"),
+            get_string(parameters, "schema_input"),
         )
         return ok_result()
     except ValidationFailure as failure:

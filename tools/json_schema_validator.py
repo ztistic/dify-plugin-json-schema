@@ -11,26 +11,22 @@ from utils.failures import (
     unexpected_failure_result,
 )
 from utils.schema_validation import validate_json_input
-from utils.strings import stringify_parameter
+from utils.strings import get_string
 
 
 class JsonSchemaValidatorTool(Tool):
     """Deterministic JSON Schema gate that sits right after an LLM node."""
 
     def _invoke(
-        self, tool_parameters: dict[str, Any]
+            self, tool_parameters: dict[str, Any]
     ) -> Generator[ToolInvokeMessage, None, None]:
         # Parameter values arrive from Dify as arbitrary decoded JSON; turning
         # them into the two strings the validator expects is the boundary's
         # job, not the validator's. Likewise, the tool is the boundary that
         # must never raise: every escape becomes a structured payload.
         try:
-            instance_text = stringify_parameter(
-                tool_parameters.get("json_input"), "json_input"
-            )
-            schema_text = stringify_parameter(
-                tool_parameters.get("schema_input"), "schema_input"
-            )
+            instance_text = get_string(tool_parameters, "json_input")
+            schema_text = get_string(tool_parameters, "schema_input")
             validate_json_input(instance_text, schema_text)
             result = ok_result()
         except ValidationFailure as failure:

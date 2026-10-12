@@ -167,7 +167,7 @@ def validate_json_input(
 
     Both arguments must already be strings. Converting arbitrary parameter
     values into JSON text -- and rejecting missing or blank ones -- is the
-    caller's job, see :func:`utils.strings.stringify_parameter`.
+    caller's job, see :mod:`utils.strings`.
 
     Returns ``None`` when the input satisfies the schema. Raises
     :class:`ValidationFailure` for every classified failure: invalid JSON, an
