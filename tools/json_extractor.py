@@ -18,7 +18,7 @@ class JsonExtractorTool(Tool):
         # Same boundary contract as the validator: adapt raw parameters, and
         # never let an exception escape -- every failure is a payload.
         try:
-            text = get_string(tool_parameters, "llm_output")
+            text = get_string(tool_parameters, "text")
             result = {"found": True, "json": extract_json(text)}
         except ValidationFailure as failure:
             result = {
@@ -42,7 +42,12 @@ class JsonExtractorTool(Tool):
 
 
 def _summary(result: dict[str, Any]) -> str:
-    """Render an extraction result as the tool's human-readable text output."""
+    """Render an extraction result as the tool's text output.
+
+    On success the extracted JSON string itself is the text output, so a
+    downstream node can consume it directly; on failure the text is empty and
+    the failure detail lives in the JSON payload only.
+    """
     if result.get("found"):
-        return "Extracted JSON."
-    return f"Extraction failed [{result.get('error_type')}]: {result.get('error')}"
+        return result["json"]
+    return ""

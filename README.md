@@ -19,8 +19,8 @@ broken answer becomes a typed, branchable result instead of a silent failure.
 
 ## Features
 
-- **JSON Extract** — pulls the first parseable JSON string out of a raw LLM
-  answer. No guessing, no cleanup, no repair.
+- **JSON Extract** — pulls the first parseable JSON string out of a text,
+  typically a raw LLM answer. No guessing, no cleanup, no repair.
 - **JSON Validate** — validates a JSON string against a JSON Schema (drafts
   2020-12 / 2019-09 / 07 / 06 / 04) and classifies every failure into a
   typed `error_type`.
@@ -41,9 +41,9 @@ LLM node -> JSON Extract -> JSON Validate -> branch on the results
 
 ### JSON Extract
 
-| Parameter    | Type   | Required | Description                            |
-|--------------|--------|----------|----------------------------------------|
-| `llm_output` | string | yes      | Raw answer text of the upstream LLM node |
+| Parameter | Type   | Required | Description                                       |
+|-----------|--------|----------|---------------------------------------------------|
+| `text`    | string | yes      | Text containing JSON, typically the output of an LLM |
 
 Two unambiguous shapes are recognized, tried in order:
 
@@ -66,11 +66,14 @@ instead of propagating.
 | `error_type` | string  | on failure | Failure category, see below                  |
 | `error`      | string  | on failure | Human-readable explanation                   |
 
+The text message carries the extracted JSON string on success, and is empty
+on failure.
+
 ##### Error Types
 
 | `error_type`    | Meaning                                          |
 |-----------------|--------------------------------------------------|
-| `invalid_input` | `llm_output` missing or blank                    |
+| `invalid_input` | `text` missing or blank                          |
 | `no_json_found` | Not JSON as a whole; no parseable json fence     |
 | `internal_error`| Unexpected failure, e.g. input nested too deeply |
 

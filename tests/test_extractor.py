@@ -28,32 +28,30 @@ def json_of(messages):
 
 class TestToolMessages:
     def test_success_emits_text_then_json(self):
-        messages = invoke(llm_output='Sure!\n```json\n{"a": 1}\n```')
+        messages = invoke(text='Sure!\n```json\n{"a": 1}\n```')
         assert len(messages) == 2
         assert messages[0].type == InvokeMessage.MessageType.TEXT
         assert messages[1].type == InvokeMessage.MessageType.JSON
-        assert text_of(messages) == "Extracted JSON."
+        assert text_of(messages) == '{"a": 1}'
         assert json_of(messages) == {"found": True, "json": '{"a": 1}'}
 
     def test_whole_input(self):
-        assert json_of(invoke(llm_output='{"a": 1}')) == {
+        assert json_of(invoke(text='{"a": 1}')) == {
             "found": True,
             "json": '{"a": 1}',
         }
 
     def test_miss_payload_has_all_fields(self):
-        payload = json_of(invoke(llm_output="no json here"))
+        payload = json_of(invoke(text="no json here"))
         assert payload["found"] is False
         assert payload["error_type"] == "no_json_found"
         assert set(payload) == {"found", "error_type", "error"}
 
-    def test_miss_text_includes_error_type(self):
-        assert text_of(invoke(llm_output="no json here")).startswith(
-            "Extraction failed [no_json_found]:"
-        )
+    def test_miss_text_is_empty(self):
+        assert text_of(invoke(text="no json here")) == ""
 
     def test_missing_parameter_is_invalid_input(self):
         payload = json_of(invoke())
         assert payload["found"] is False
         assert payload["error_type"] == "invalid_input"
-        assert payload["error"] == "llm_output is empty"
+        assert payload["error"] == "text is empty"

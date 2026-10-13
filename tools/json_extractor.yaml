@@ -6,20 +6,20 @@ identity:
     zh_Hans: JSON 提取
 description:
   human:
-    en_US: Extract the first parseable JSON string from raw LLM output
-    zh_Hans: 从大模型原始输出中提取第一段可解析的 JSON 字符串
-  llm: "Extract the first parseable JSON string from raw LLM output. Recognizes two shapes only: the whole text being JSON, or a ```json fenced code block. Bare JSON embedded in prose is not extracted. Returns found and json, or found=false with error_type (invalid_input, no_json_found, internal_error). Pipe the extracted json string into the JSON Schema Validator."
+    en_US: Extract the first parseable JSON string from text, typically LLM output
+    zh_Hans: 从文本（通常是 LLM 的输出）中提取第一段可解析的 JSON 字符串
+  llm: "Extract the first parseable JSON string from a text, typically the output of an LLM. Recognizes two shapes only: the whole text being JSON, or a Markdown ```json (or untagged) fenced code block, whose content is returned verbatim. Bare JSON embedded in prose is not extracted. Returns found and json, or found=false with error_type (invalid_input, no_json_found, internal_error). Pipe the extracted json string into the JSON Schema Validator."
 parameters:
-  - name: llm_output
+  - name: text
     type: string
     required: true
     label:
-      en_US: LLM Output
-      zh_Hans: 大模型输出
+      en_US: Text
+      zh_Hans: 文本
     human_description:
-      en_US: The raw answer text of an upstream LLM node
-      zh_Hans: 上游 LLM 节点的原始输出文本
-    llm_description: The raw LLM answer text to extract JSON from. If the model wrapped the JSON in a Markdown code block, the block content is returned verbatim; prose around bare JSON is not handled.
+      en_US: Text containing JSON, typically the output of an LLM
+      zh_Hans: 包含 JSON 的文本，通常是 LLM 的输出
+    llm_description: The text to extract JSON from, typically an LLM answer. Only two shapes are recognized: the whole text being JSON, or a Markdown ```json (or untagged) fenced code block; prose around bare JSON is not handled.
     form: llm
 extra:
   python:
