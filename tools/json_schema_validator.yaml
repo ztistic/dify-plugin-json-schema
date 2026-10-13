@@ -32,6 +32,29 @@ parameters:
       zh_Hans: 用于校验输入的 JSON Schema
     llm_description: "The JSON Schema definition string. Draft 2020-12, 2019-09, 07, 06 and 04 are supported. Only inline $ref pointers can be resolved. The schema is applied exactly as written -- to reject undeclared properties, declare additionalProperties: false yourself."
     form: llm
+output_schema:
+  type: object
+  properties:
+    is_valid:
+      type: boolean
+      description: Whether the input satisfies the schema
+    message:
+      type: string
+      description: '"Validation passed."; present on success'
+    error_type:
+      type: string
+      description: Failure category; present on failure (invalid_input, invalid_json, invalid_schema_json, schema_error, unsupported_draft, ref_resolution_error, validation_failed, internal_error)
+    error:
+      type: string
+      description: Human-readable failure detail; present on failure
+    path:
+      type: array
+      description: 'Location in the JSON that failed, e.g. ["tags", 2]; present on failure, empty when not applicable'
+      items: {}
+    schema_path:
+      type: array
+      description: Location in the schema of the violated keyword; present on failure, empty when not applicable
+      items: {}
 extra:
   python:
     source: tools/json_schema_validator.py

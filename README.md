@@ -57,7 +57,8 @@ JSON embedded bare in prose is outside these shapes and is reported as
 
 The tool is designed not to raise: every classified failure returns a typed
 payload, and an unexpected internal error is reported as `internal_error`
-instead of propagating.
+instead of propagating. The fields below are declared in the tool's
+`output_schema`, so downstream nodes see them as typed variables.
 
 | Field        | Type    | Present    | Description                                  |
 |--------------|---------|------------|----------------------------------------------|
@@ -88,7 +89,8 @@ on failure.
 
 The tool is designed not to raise: every classified failure returns a typed
 payload, and an unexpected internal error is reported as `internal_error`
-instead of propagating.
+instead of propagating. The fields below are declared in the tool's
+`output_schema`, so downstream nodes see them as typed variables.
 
 | Field         | Type    | Present    | Description                                   |
 |---------------|---------|------------|-----------------------------------------------|

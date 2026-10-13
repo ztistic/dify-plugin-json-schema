@@ -19,8 +19,23 @@ parameters:
     human_description:
       en_US: Text containing JSON, typically the output of an LLM
       zh_Hans: 包含 JSON 的文本，通常是 LLM 的输出
-    llm_description: The text to extract JSON from, typically an LLM answer. Only two shapes are recognized: the whole text being JSON, or a Markdown ```json (or untagged) fenced code block; prose around bare JSON is not handled.
+    llm_description: "The text to extract JSON from, typically an LLM answer. Only two shapes are recognized: the whole text being JSON, or a Markdown ```json (or untagged) fenced code block; prose around bare JSON is not handled."
     form: llm
+output_schema:
+  type: object
+  properties:
+    found:
+      type: boolean
+      description: Whether a parseable JSON string was extracted
+    json:
+      type: string
+      description: The extracted JSON text, verbatim; present on success
+    error_type:
+      type: string
+      description: Failure category; present on failure (invalid_input, no_json_found, internal_error)
+    error:
+      type: string
+      description: Human-readable failure detail; present on failure
 extra:
   python:
     source: tools/json_extractor.py
