@@ -2,8 +2,8 @@ identity:
   name: json_extractor
   author: eft
   label:
-    en_US: JSON Extractor
-    zh_Hans: JSON 提取器
+    en_US: JSON Extract
+    zh_Hans: JSON 提取
 description:
   human:
     en_US: Extract the first parseable JSON string from raw LLM output

@@ -2,8 +2,8 @@ identity:
   name: json_schema_validator
   author: eft
   label:
-    en_US: JSON Schema Validator
-    zh_Hans: JSON Schema 校验器
+    en_US: JSON Validate
+    zh_Hans: JSON 校验
 description:
   human:
     en_US: Validate a JSON string against a JSON Schema and return a typed result

@@ -1,7 +1,7 @@
 version: 1.0.0
 type: plugin
 author: eft
-name: json-schema
+name: jsonschema
 repo: https://github.com/ztistic/dify-plugin-json-schema
 contact: ztistic@outlook.com
 label:

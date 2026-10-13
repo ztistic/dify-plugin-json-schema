@@ -19,11 +19,11 @@ broken answer becomes a typed, branchable result instead of a silent failure.
 
 ## Features
 
-- **JSON Extractor** — pulls the first parseable JSON string out of a raw LLM
+- **JSON Extract** — pulls the first parseable JSON string out of a raw LLM
   answer. No guessing, no cleanup, no repair.
-- **JSON Schema Validator** — validates a JSON string against a JSON Schema
-  (drafts 2020-12 / 2019-09 / 07 / 06 / 04) and classifies every failure into
-  a typed `error_type`.
+- **JSON Validate** — validates a JSON string against a JSON Schema (drafts
+  2020-12 / 2019-09 / 07 / 06 / 04) and classifies every failure into a
+  typed `error_type`.
 - Runs offline: no network access, no model calls.
 
 ## Setup
@@ -36,10 +36,10 @@ Install **JSON Schema** from the Dify Marketplace, or upload the packaged
 ## Usage
 
 ```
-LLM node -> JSON Extractor -> JSON Schema Validator -> branch on the results
+LLM node -> JSON Extract -> JSON Validate -> branch on the results
 ```
 
-### JSON Extractor
+### JSON Extract
 
 | Parameter    | Type   | Required | Description                            |
 |--------------|--------|----------|----------------------------------------|
@@ -74,7 +74,7 @@ instead of propagating.
 | `no_json_found` | Not JSON as a whole; no parseable json fence     |
 | `internal_error`| Unexpected failure, e.g. input nested too deeply |
 
-### JSON Schema Validator
+### JSON Validate
 
 | Parameter      | Type   | Required | Description                                      |
 |----------------|--------|----------|--------------------------------------------------|
