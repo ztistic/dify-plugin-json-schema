@@ -8,7 +8,7 @@ description:
   human:
     en_US: Validate a JSON string against a JSON Schema and return a typed result
     zh_Hans: 校验 JSON 字符串是否符合指定的 JSON Schema，并返回带类型标记的结果
-  llm: "Validate a JSON string against a JSON Schema. Returns is_valid, error_type, error_detail, absolute_path, json_path and schema_path. error_type is one of: invalid_input, invalid_json, invalid_schema_json, schema_error, unsupported_draft, ref_resolution_error, internal_error, validation_failed. Use this as a quality gate after an LLM node before consuming structured output downstream."
+  llm: "Validate a JSON string against a JSON Schema. Returns is_valid, error_type, error_detail, json_path and schema_json_path. error_type is one of: invalid_input, invalid_json, invalid_schema_json, schema_error, unsupported_draft, ref_resolution_error, internal_error, validation_failed. Use this as a quality gate after an LLM node before consuming structured output downstream."
 parameters:
   - name: json_input
     type: string
@@ -44,17 +44,12 @@ output_schema:
     error_detail:
       type: string
       description: Human-readable failure detail; present on failure
-    absolute_path:
-      type: array
-      description: 'Location in the JSON that failed as path segments, e.g. ["tags", 2]; present on failure, empty when not applicable'
-      items: {}
     json_path:
       type: string
       description: 'Location in the JSON that failed as a JSONPath string, e.g. "$.tags[1]"; present on failure, empty when not applicable'
-    schema_path:
-      type: array
-      description: Location in the schema of the violated keyword; present on failure, empty when not applicable
-      items: {}
+    schema_json_path:
+      type: string
+      description: 'Location in the schema of the violated keyword as a JSONPath string, e.g. "$.properties.age.minimum"; present on failure, empty when not applicable'
 extra:
   python:
     source: tools/json_schema_validator.py

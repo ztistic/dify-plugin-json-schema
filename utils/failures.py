@@ -16,24 +16,22 @@ class ValidationFailure(Exception):
 
     Raised at the point of detection. Carries everything the failure payload
     needs: the error type, the human-readable message, and the failure
-    locations (the instance path, its JSONPath rendering, and the schema
-    path).
+    locations (the JSONPath of the offending instance value and of the
+    violated schema keyword).
     """
 
     def __init__(
             self,
             error_type: str,
             error: str,
-            absolute_path: Any = (),
-            schema_path: Any = (),
             json_path: str = "",
+            schema_json_path: str = "",
     ) -> None:
         super().__init__(error)
         self.error_type = error_type
         self.error = error
-        self.absolute_path = list(absolute_path)
-        self.schema_path = list(schema_path)
         self.json_path = json_path
+        self.schema_json_path = schema_json_path
 
     def to_result(self) -> dict[str, Any]:
         """Convert the failure into the structured failure payload."""
@@ -41,9 +39,8 @@ class ValidationFailure(Exception):
             "is_valid": False,
             "error_type": self.error_type,
             "error_detail": self.error,
-            "absolute_path": list(self.absolute_path),
             "json_path": self.json_path,
-            "schema_path": list(self.schema_path),
+            "schema_json_path": self.schema_json_path,
         }
 
 
@@ -80,28 +77,28 @@ def error_fields(error_type: str, error: str) -> dict[str, Any]:
 def _fail(
         error_type: str,
         error: str,
-        absolute_path: Any = None,
-        schema_path: Any = None,
         json_path: str = "",
+        schema_json_path: str = "",
 ) -> dict[str, Any]:
     """Build the payload for a failed validation.
 
-    ``absolute_path``, ``json_path`` and ``schema_path`` are always present
-    so downstream nodes can branch on them without defensive checks.
+    ``json_path`` and ``schema_json_path`` are always present so downstream
+    nodes can branch on them without defensive checks.
     """
     return {
         "is_valid": False,
         **error_fields(error_type, error),
-        "absolute_path": list(absolute_path or []),
         "json_path": json_path,
-        "schema_path": list(schema_path or []),
+        "schema_json_path": schema_json_path,
     }
 
 
 def format_path(path: Any) -> str:
-    """Render a JSON pointer path in a human-readable dotted form."""
-    if not path:
-        return "$ (root)"
+    """Render a path (list of segments) as a JSONPath string.
+
+    The root renders as ``$``; object keys follow as ``.key`` and array
+    indices as ``[i]``, e.g. ``$.address.city`` or ``$.tags[1]``.
+    """
     rendered = "$"
     for item in path:
         rendered += f"[{item}]" if isinstance(item, int) else f".{item}"
@@ -114,6 +111,6 @@ def format_summary(result: dict[str, Any]) -> str:
         return "Validation passed."
     return (
         f"Validation failed [{result.get('error_type')}]: {result.get('error_detail')}\n"
-        f"JSON path: {format_path(result.get('absolute_path'))}\n"
-        f"Schema path: {format_path(result.get('schema_path'))}"
+        f"JSON path: {result.get('json_path')}\n"
+        f"Schema path: {result.get('schema_json_path')}"
     )

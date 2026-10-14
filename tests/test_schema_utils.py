@@ -88,20 +88,20 @@ class TestValidationFailure:
         assert result["is_valid"] is False
         assert result["error_type"] == "validation_failed"
         assert "is not of type" in result["error_detail"]
-        assert result["absolute_path"] == ["age"]
-        assert result["schema_path"] == ["properties", "age", "type"]
+        assert result["json_path"] == "$.age"
+        assert result["schema_json_path"] == "$.properties.age.type"
 
     def test_missing_required_property(self):
         result = run(json.dumps({"name": "Alice"}), PERSON_SCHEMA)
         assert result["error_type"] == "validation_failed"
         assert result["error_detail"] == "'age' is a required property"
-        assert result["schema_path"] == ["required"]
+        assert result["schema_json_path"] == "$.required"
 
     def test_value_below_minimum(self):
         result = run(json.dumps({"name": "Alice", "age": -1}), PERSON_SCHEMA)
         assert result["error_type"] == "validation_failed"
-        assert result["absolute_path"] == ["age"]
-        assert result["schema_path"] == ["properties", "age", "minimum"]
+        assert result["json_path"] == "$.age"
+        assert result["schema_json_path"] == "$.properties.age.minimum"
 
     def test_nested_path_is_reported_as_list(self):
         schema = json.dumps(
@@ -117,8 +117,8 @@ class TestValidationFailure:
             }
         )
         result = run(json.dumps({"user": {}}), schema)
-        assert result["absolute_path"] == ["user"]
-        assert result["schema_path"] == ["properties", "user", "required"]
+        assert result["json_path"] == "$.user"
+        assert result["schema_json_path"] == "$.properties.user.required"
 
     def test_array_index_appears_in_path(self):
         schema = json.dumps(
@@ -128,7 +128,7 @@ class TestValidationFailure:
             }
         )
         result = run(json.dumps({"tags": ["ok", 3]}), schema)
-        assert result["absolute_path"] == ["tags", 1]
+        assert result["json_path"] == "$.tags[1]"
 
     def test_boolean_false_schema_fails(self):
         result = run('{"a": 1}', "false")
@@ -189,7 +189,7 @@ class TestSchemaStructureErrors:
         result = run('{"a": 1}', '{"type": "nope"}')
         assert result["error_type"] == "schema_error"
         assert result["error_detail"].startswith("Schema itself is invalid:")
-        assert result["schema_path"]
+        assert result["schema_json_path"]
 
     def test_wrong_keyword_type(self):
         result = run('{"a": 1}', '{"required": "name"}')
@@ -295,7 +295,7 @@ class TestDraftSupport:
         assert run('{"a": 7}', draft_four)["is_valid"] is True
         failed = run('{"a": 7}', draft_seven)
         assert failed["error_type"] == "validation_failed"
-        assert failed["absolute_path"] == ["a"]
+        assert failed["json_path"] == "$.a"
 
     def test_generic_pointer_defaults_to_latest(self):
         schema = json.dumps({"$schema": "http://json-schema.org/schema#", "type": "object"})
@@ -491,7 +491,7 @@ class TestNoInputPreprocessing:
 
 class TestFormatting:
     def test_format_path_root(self):
-        assert format_path([]) == "$ (root)"
+        assert format_path([]) == "$"
 
     def test_format_path_mixed(self):
         assert format_path(["users", 0, "name"]) == "$.users[0].name"
@@ -505,9 +505,8 @@ class TestFormatting:
                 "is_valid": False,
                 "error_type": "validation_failed",
                 "error_detail": "'age' is a required property",
-                "absolute_path": ["user"],
                 "json_path": "$.user",
-                "schema_path": ["properties", "user", "required"],
+                "schema_json_path": "$.properties.user.required",
             }
         )
         assert "validation_failed" in summary

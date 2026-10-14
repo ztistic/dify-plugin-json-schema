@@ -96,9 +96,8 @@ instead of propagating. The fields below are declared in the tool's
 | `is_valid`    | boolean | always     | Whether the input satisfies the schema                                                                                              |
 | `error_type`  | string  | on failure | Failure category, see below                                                                                                         |
 | `error_detail`  | string  | on failure | Human-readable explanation, safe to feed back into a retry prompt                                                                   |
-| `absolute_path` | array   | on failure | Location in the JSON that failed, e.g. `["tags", 2]` — always present, empty when not applicable                                    |
-| `json_path`     | string  | on failure | The same location as a JSONPath string, e.g. `$.tags[1]` — always present, empty when not applicable                                |
-| `schema_path`   | array   | on failure | Location in the schema of the violated keyword, e.g. `["properties", "age", "minimum"]` — always present, empty when not applicable |
+| `json_path`        | string  | on failure | Location in the JSON that failed as a JSONPath string, e.g. `$.tags[1]` — always present, empty when not applicable              |
+| `schema_json_path` | string  | on failure | Location in the schema of the violated keyword as a JSONPath string, e.g. `$.properties.age.minimum` — always present, empty when not applicable |
 
 ##### Error Types
 
@@ -110,7 +109,7 @@ instead of propagating. The fields below are declared in the tool's
 | `schema_error`         | The schema itself violates its metaschema                                                         |
 | `unsupported_draft`    | `$schema` declares a draft other than 2020-12 / 2019-09 / 07 / 06 / 04                            |
 | `ref_resolution_error` | An inline `$ref` pointer cannot be resolved; remote refs are never fetched                        |
-| `validation_failed`    | Valid JSON, valid schema — the data does not match; `absolute_path`, `json_path` and `schema_path` point at the failure |
+| `validation_failed`    | Valid JSON, valid schema — the data does not match; `json_path` and `schema_json_path` point at the failure |
 | `internal_error`       | Unexpected failure, e.g. nesting beyond interpreter depth                                         |
 
 Notes:
@@ -120,7 +119,7 @@ Notes:
   `invalid_json`.
 - The schema is applied exactly as written; `additionalProperties: false` is
   how undeclared properties get rejected.
-- `error_detail`, `absolute_path`, `json_path` and `schema_path` are suitable for feeding back into a
+- `error_detail`, `json_path` and `schema_json_path` are suitable for feeding back into a
   retry prompt.
 
 ## Limits
