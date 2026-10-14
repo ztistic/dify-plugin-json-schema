@@ -26,14 +26,33 @@ def json_of(messages):
     return messages[1].message.json_object
 
 
+def variables_of(messages):
+    return {
+        m.message.variable_name: m.message.variable_value
+        for m in messages
+        if m.type == InvokeMessage.MessageType.VARIABLE
+    }
+
+
 class TestToolMessages:
     def test_success_emits_text_then_json(self):
         messages = invoke(text='Sure!\n```json\n{"a": 1}\n```')
-        assert len(messages) == 2
         assert messages[0].type == InvokeMessage.MessageType.TEXT
         assert messages[1].type == InvokeMessage.MessageType.JSON
         assert text_of(messages) == '{"a": 1}'
         assert json_of(messages) == {"found": True, "json": '{"a": 1}'}
+
+    def test_text_and_json_come_first(self):
+        # Downstream helpers rely on message order: summary, payload, then
+        # one variable message per declared output.
+        messages = invoke(text='{"a": 1}')
+        assert [m.type for m in messages][:2] == [
+            InvokeMessage.MessageType.TEXT,
+            InvokeMessage.MessageType.JSON,
+        ]
+        assert all(
+            m.type == InvokeMessage.MessageType.VARIABLE for m in messages[2:]
+        )
 
     def test_whole_input(self):
         assert json_of(invoke(text='{"a": 1}')) == {
@@ -55,3 +74,27 @@ class TestToolMessages:
         assert payload["found"] is False
         assert payload["error_type"] == "invalid_input"
         assert payload["error"] == "text is empty"
+
+
+class TestOutputVariables:
+    """Declared output_schema variables must be returned as VARIABLE messages,
+    otherwise Dify reports "Variable not found" for downstream references."""
+
+    def test_success_variables(self):
+        messages = invoke(text='```json\n{"a": 1}\n```')
+        assert variables_of(messages) == {"found": True, "json": '{"a": 1}'}
+
+    def test_failure_variables(self):
+        messages = invoke(text="no json here")
+        assert variables_of(messages) == {
+            "found": False,
+            "error_type": "no_json_found",
+            "error": (
+                "No parseable JSON found: the input is not JSON, and it "
+                "contains no parseable ```json code block"
+            ),
+        }
+
+    def test_variables_match_json_payload(self):
+        messages = invoke(text="no json here")
+        assert variables_of(messages) == json_of(messages)

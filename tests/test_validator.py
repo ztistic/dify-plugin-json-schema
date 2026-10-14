@@ -37,10 +37,17 @@ def json_of(messages):
     return messages[1].message.json_object
 
 
+def variables_of(messages):
+    return {
+        m.message.variable_name: m.message.variable_value
+        for m in messages
+        if m.type == InvokeMessage.MessageType.VARIABLE
+    }
+
+
 class TestToolMessages:
     def test_success_emits_text_then_json(self):
         messages = invoke(json_input='{"age": 30}', schema_input=PERSON_SCHEMA)
-        assert len(messages) == 2
         assert messages[0].type == InvokeMessage.MessageType.TEXT
         assert messages[1].type == InvokeMessage.MessageType.JSON
         assert text_of(messages) == "Validation passed."
@@ -48,6 +55,18 @@ class TestToolMessages:
             "is_valid": True,
             "message": "Validation passed.",
         }
+
+    def test_text_and_json_come_first(self):
+        # Downstream helpers rely on message order: summary, payload, then
+        # one variable message per declared output.
+        messages = invoke(json_input='{"age": 30}', schema_input=PERSON_SCHEMA)
+        assert [m.type for m in messages][:2] == [
+            InvokeMessage.MessageType.TEXT,
+            InvokeMessage.MessageType.JSON,
+        ]
+        assert all(
+            m.type == InvokeMessage.MessageType.VARIABLE for m in messages[2:]
+        )
 
     def test_failure_payload_has_all_fields(self):
         messages = invoke(json_input='{"name": "Alice"}', schema_input=PERSON_SCHEMA)
@@ -79,3 +98,29 @@ class TestSyntaxErrorMessages:
     def test_invalid_schema_json(self):
         messages = invoke(json_input='{"age": 1}', schema_input='{"a": }')
         assert json_of(messages)["error_type"] == "invalid_schema_json"
+
+
+class TestOutputVariables:
+    """Declared output_schema variables must be returned as VARIABLE messages,
+    otherwise Dify fills them with None at runtime."""
+
+    def test_success_variables(self):
+        messages = invoke(json_input='{"age": 30}', schema_input=PERSON_SCHEMA)
+        assert variables_of(messages) == {
+            "is_valid": True,
+            "message": "Validation passed.",
+        }
+
+    def test_failure_variables(self):
+        messages = invoke(json_input='{"name": "Alice"}', schema_input=PERSON_SCHEMA)
+        assert variables_of(messages) == {
+            "is_valid": False,
+            "error_type": "validation_failed",
+            "error": "'age' is a required property",
+            "path": [],
+            "schema_path": ["required"],
+        }
+
+    def test_variables_match_json_payload(self):
+        messages = invoke(json_input='{"age": -1}', schema_input=PERSON_SCHEMA)
+        assert variables_of(messages) == json_of(messages)

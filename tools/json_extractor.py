@@ -39,6 +39,12 @@ class JsonExtractorTool(Tool):
         # reads first, the JSON payload is what downstream nodes parse.
         yield self.create_text_message(_summary(result))
         yield self.create_json_message(result)
+        # Declaring output_schema is not enough: Dify only populates the named
+        # output variables (found, json, error_type, error) if the tool returns
+        # them via create_variable_message. Without this loop, referencing
+        # {{node.found}} in a downstream branch fails with "Variable not found".
+        for name, value in result.items():
+            yield self.create_variable_message(name, value)
 
 
 def _summary(result: dict[str, Any]) -> str:

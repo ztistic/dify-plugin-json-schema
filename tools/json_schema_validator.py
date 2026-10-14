@@ -38,3 +38,9 @@ class JsonSchemaValidatorTool(Tool):
         # reads first, the JSON payload is what downstream nodes parse.
         yield self.create_text_message(format_summary(result))
         yield self.create_json_message(result)
+        # Declaring output_schema is not enough: Dify only populates the named
+        # output variables if the tool returns them via create_variable_message.
+        # Without this loop every declared variable (is_valid, error_type, ...)
+        # would reach the workflow as None.
+        for name, value in result.items():
+            yield self.create_variable_message(name, value)
