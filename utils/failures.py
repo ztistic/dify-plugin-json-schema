@@ -60,43 +60,24 @@ def unexpected_failure_result(escaped: BaseException) -> dict[str, Any]:
     The validator raises :class:`ValidationFailure` for every classified
     failure; anything else that escapes lands here at the call site, which
     must still answer with a structured payload rather than let an exception
-    out of a Dify tool.
+    out of a Dify tool. The three path fields are always present -- empty
+    here, since an unclassified escape carries no location -- so downstream
+    nodes can branch on them without defensive checks.
     """
     if isinstance(escaped, RecursionError):
-        return _fail(
-            "internal_error",
-            "The JSON or the schema is nested too deeply to be validated",
+        detail = "The JSON or the schema is nested too deeply to be validated"
+    else:
+        detail = (
+            f"Unexpected error while validating: "
+            f"{type(escaped).__name__}: {escaped}"
         )
-    return _fail(
-        "internal_error",
-        f"Unexpected error while validating: "
-        f"{type(escaped).__name__}: {escaped}",
-    )
-
-
-def error_fields(error_type: str, error: str) -> dict[str, Any]:
-    """The two fields every failure payload carries."""
-    return {"error_type": error_type, "error_detail": error}
-
-
-def _fail(
-        error_type: str,
-        error: str,
-        json_path: str = "",
-        absolute_path: Any = None,
-        absolute_schema_path: Any = None,
-) -> dict[str, Any]:
-    """Build the payload for a failed validation.
-
-    The three path fields are always present so downstream nodes can branch
-    on them without defensive checks.
-    """
     return {
         "is_valid": False,
-        **error_fields(error_type, error),
-        "json_path": json_path,
-        "absolute_path": list(absolute_path or []),
-        "absolute_schema_path": list(absolute_schema_path or []),
+        "error_type": "internal_error",
+        "error_detail": detail,
+        "json_path": "",
+        "absolute_path": [],
+        "absolute_schema_path": [],
     }
 
 
