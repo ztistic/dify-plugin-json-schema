@@ -42,7 +42,7 @@ LLM node -> JSON Extract -> JSON Validate -> branch on the results
 
 | Parameter | Type   | Required | Description                                          |
 |-----------|--------|----------|------------------------------------------------------|
-| `text`    | string | yes      | Text containing JSON, typically the output of an LLM |
+| `text`    | string | yes      | Text containing JSON, typically the output of an LLM (only whole-text JSON, or JSON inside a Markdown code fence) |
 
 Two unambiguous shapes are recognized, tried in order:
 

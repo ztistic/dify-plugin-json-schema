@@ -17,8 +17,8 @@ parameters:
       en_US: JSON Input
       zh_Hans: JSON 数据
     human_description:
-      en_US: The JSON string to validate, typically the output of an upstream LLM node
-      zh_Hans: 需要校验的 JSON 字符串，通常是上游 LLM 节点的输出
+      en_US: The JSON string to validate (only text that is itself valid JSON; Markdown code fences and other wrappers are not stripped)
+      zh_Hans: 需要校验的 JSON 字符串（仅接受本身即为合法 JSON 的文本，不处理 Markdown 代码围栏等包装）
     llm_description: The JSON data string to be validated. Must be raw, parseable JSON -- the tool does not strip Markdown code fences or other wrappers, so run the JSON Extractor tool first if the source is an LLM answer.
     form: llm
   - name: schema_input

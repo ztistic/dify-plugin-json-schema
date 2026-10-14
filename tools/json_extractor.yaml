@@ -17,8 +17,8 @@ parameters:
       en_US: Text
       zh_Hans: 文本
     human_description:
-      en_US: Text containing JSON, typically the output of an LLM
-      zh_Hans: 包含 JSON 的文本，通常是 LLM 的输出
+      en_US: Text containing JSON, typically the output of an LLM (only whole-text JSON, or JSON inside a Markdown code fence)
+      zh_Hans: 包含 JSON 的文本，通常是 LLM 的输出（仅支持整体为 JSON，或 Markdown 代码围栏包裹的 JSON）
     llm_description: "The text to extract JSON from, typically an LLM answer. Only two shapes are recognized: the whole text being JSON, or a Markdown ```json (or untagged) fenced code block; prose around bare JSON is not handled."
     form: llm
 output_schema:
