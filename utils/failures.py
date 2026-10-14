@@ -15,29 +15,34 @@ class ValidationFailure(Exception):
     """A known, classified validation failure.
 
     Raised at the point of detection. Carries everything the failure payload
-    needs: the error type, the human-readable message, and both paths.
+    needs: the error type, the human-readable message, and the failure
+    locations (the instance path, its JSONPath rendering, and the schema
+    path).
     """
 
     def __init__(
             self,
             error_type: str,
             error: str,
-            path: Any = (),
+            absolute_path: Any = (),
             schema_path: Any = (),
+            json_path: str = "",
     ) -> None:
         super().__init__(error)
         self.error_type = error_type
         self.error = error
-        self.path = list(path)
+        self.absolute_path = list(absolute_path)
         self.schema_path = list(schema_path)
+        self.json_path = json_path
 
     def to_result(self) -> dict[str, Any]:
         """Convert the failure into the structured failure payload."""
         return {
             "is_valid": False,
             "error_type": self.error_type,
-            "error": self.error,
-            "path": list(self.path),
+            "error_detail": self.error,
+            "absolute_path": list(self.absolute_path),
+            "json_path": self.json_path,
             "schema_path": list(self.schema_path),
         }
 
@@ -69,24 +74,26 @@ def unexpected_failure_result(escaped: BaseException) -> dict[str, Any]:
 
 def error_fields(error_type: str, error: str) -> dict[str, Any]:
     """The two fields every failure payload carries."""
-    return {"error_type": error_type, "error": error}
+    return {"error_type": error_type, "error_detail": error}
 
 
 def _fail(
         error_type: str,
         error: str,
-        path: Any = None,
+        absolute_path: Any = None,
         schema_path: Any = None,
+        json_path: str = "",
 ) -> dict[str, Any]:
     """Build the payload for a failed validation.
 
-    ``path`` and ``schema_path`` are always present so downstream nodes can
-    branch on them without defensive checks.
+    ``absolute_path``, ``json_path`` and ``schema_path`` are always present
+    so downstream nodes can branch on them without defensive checks.
     """
     return {
         "is_valid": False,
         **error_fields(error_type, error),
-        "path": list(path or []),
+        "absolute_path": list(absolute_path or []),
+        "json_path": json_path,
         "schema_path": list(schema_path or []),
     }
 
@@ -106,7 +113,7 @@ def format_summary(result: dict[str, Any]) -> str:
     if result.get("is_valid"):
         return str(result.get("message") or "Validation passed.")
     return (
-        f"Validation failed [{result.get('error_type')}]: {result.get('error')}\n"
-        f"JSON path: {format_path(result.get('path'))}\n"
+        f"Validation failed [{result.get('error_type')}]: {result.get('error_detail')}\n"
+        f"JSON path: {format_path(result.get('absolute_path'))}\n"
         f"Schema path: {format_path(result.get('schema_path'))}"
     )

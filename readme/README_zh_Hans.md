@@ -90,21 +90,22 @@ text 消息在成功时为提取出的 JSON 字符串，失败时为空。
 | `is_valid`    | boolean | 总是     | 输入是否满足 Schema                                                                                  |
 | `message`     | string  | 成功时   | `"Validation passed."`                                                                               |
 | `error_type`  | string  | 失败时   | 失败类别，见下表                                                                                     |
-| `error`       | string  | 失败时   | 人类可读的原因，可直接回填重试提示词                                                                 |
-| `path`        | array   | 失败时   | JSON 中出错的位置，如 `["tags", 2]`——始终存在，不适用时为空                                          |
-| `schema_path` | array   | 失败时   | Schema 中被违反关键字的位置，如 `["properties", "age", "minimum"]`——失败时始终存在，不适用时为空数组 |
+| `error_detail`  | string  | 失败时   | 人类可读的原因，可直接回填重试提示词                                                                 |
+| `absolute_path` | array   | 失败时   | JSON 中出错的位置，如 `["tags", 2]`——始终存在，不适用时为空                                          |
+| `json_path`     | string  | 失败时   | 同一位置以 JSONPath 字符串表示，如 `$.tags[1]`——始终存在，不适用时为空                               |
+| `schema_path`   | array   | 失败时   | Schema 中被违反关键字的位置，如 `["properties", "age", "minimum"]`——失败时始终存在，不适用时为空数组 |
 
 ##### 错误类型
 
 | `error_type`           | 含义                                                                     |
 |------------------------|--------------------------------------------------------------------------|
 | `invalid_input`        | 参数缺失、为空白或无法转为 JSON 文本                                     |
-| `invalid_json`         | `json_input` 不是可解析的 JSON；`error` 带行号列号                       |
+| `invalid_json`         | `json_input` 不是可解析的 JSON；`error_detail` 带行号列号                       |
 | `invalid_schema_json`  | `schema_input` 不是可解析的 JSON                                         |
 | `schema_error`         | Schema 本身违反其元 Schema                                               |
 | `unsupported_draft`    | `$schema` 声明了 2020-12 / 2019-09 / 07 / 06 / 04 之外的 Draft           |
 | `ref_resolution_error` | 内联 `$ref` 指针无法解析；远程引用从不拉取                               |
-| `validation_failed`    | JSON 合法、Schema 合法，但数据不匹配；`path` 与 `schema_path` 指向失败处 |
+| `validation_failed`    | JSON 合法、Schema 合法，但数据不匹配；`absolute_path`、`json_path` 与 `schema_path` 指向失败处 |
 | `internal_error`       | 预期外失败，如嵌套超出解释器深度                                         |
 
 注意：
@@ -112,7 +113,7 @@ text 消息在成功时为提取出的 JSON 字符串，失败时为空。
 - 校验器不清洗输入：`json_input` 直接交给 `json.loads` 解析，任何本身不是
   合法 JSON 的输入都会报 `invalid_json`。
 - Schema 按原样生效；拒绝未声明属性通过 `additionalProperties: false` 表达。
-- `error`、`path`、`schema_path` 适合回填到重试提示词中。
+- `error_detail`、`absolute_path`、`json_path`、`schema_path` 适合回填到重试提示词中。
 
 ## 限制
 

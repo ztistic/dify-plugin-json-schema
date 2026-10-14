@@ -88,20 +88,20 @@ class TestValidationFailure:
         result = run(json.dumps({"name": "Alice", "age": "thirty"}), PERSON_SCHEMA)
         assert result["is_valid"] is False
         assert result["error_type"] == "validation_failed"
-        assert "is not of type" in result["error"]
-        assert result["path"] == ["age"]
+        assert "is not of type" in result["error_detail"]
+        assert result["absolute_path"] == ["age"]
         assert result["schema_path"] == ["properties", "age", "type"]
 
     def test_missing_required_property(self):
         result = run(json.dumps({"name": "Alice"}), PERSON_SCHEMA)
         assert result["error_type"] == "validation_failed"
-        assert result["error"] == "'age' is a required property"
+        assert result["error_detail"] == "'age' is a required property"
         assert result["schema_path"] == ["required"]
 
     def test_value_below_minimum(self):
         result = run(json.dumps({"name": "Alice", "age": -1}), PERSON_SCHEMA)
         assert result["error_type"] == "validation_failed"
-        assert result["path"] == ["age"]
+        assert result["absolute_path"] == ["age"]
         assert result["schema_path"] == ["properties", "age", "minimum"]
 
     def test_nested_path_is_reported_as_list(self):
@@ -118,7 +118,7 @@ class TestValidationFailure:
             }
         )
         result = run(json.dumps({"user": {}}), schema)
-        assert result["path"] == ["user"]
+        assert result["absolute_path"] == ["user"]
         assert result["schema_path"] == ["properties", "user", "required"]
 
     def test_array_index_appears_in_path(self):
@@ -129,7 +129,7 @@ class TestValidationFailure:
             }
         )
         result = run(json.dumps({"tags": ["ok", 3]}), schema)
-        assert result["path"] == ["tags", 1]
+        assert result["absolute_path"] == ["tags", 1]
 
     def test_boolean_false_schema_fails(self):
         result = run('{"a": 1}', "false")
@@ -140,7 +140,7 @@ class TestInputErrors:
     def test_empty_json_input(self):
         result = run("", PERSON_SCHEMA)
         assert result["error_type"] == "invalid_input"
-        assert result["error"] == "json_input is empty"
+        assert result["error_detail"] == "json_input is empty"
 
     def test_blank_json_input(self):
         assert run("   ", PERSON_SCHEMA)["error_type"] == "invalid_input"
@@ -148,13 +148,13 @@ class TestInputErrors:
     def test_empty_schema_input(self):
         result = run(PERSON_JSON, "")
         assert result["error_type"] == "invalid_input"
-        assert result["error"] == "schema_input is empty"
+        assert result["error_detail"] == "schema_input is empty"
 
     def test_missing_parameters(self):
         assert run(None, None)["error_type"] == "invalid_input"
 
     def test_json_input_takes_precedence_over_schema(self):
-        assert run("", "")["error"] == "json_input is empty"
+        assert run("", "")["error_detail"] == "json_input is empty"
 
 
 class TestJsonSyntaxErrors:
@@ -162,8 +162,8 @@ class TestJsonSyntaxErrors:
         result = run('{"name": "Alice",}', PERSON_SCHEMA)
         assert result["is_valid"] is False
         assert result["error_type"] == "invalid_json"
-        assert result["error"].startswith("Invalid JSON input:")
-        assert "at line" in result["error"] and "column" in result["error"]
+        assert result["error_detail"].startswith("Invalid JSON input:")
+        assert "at line" in result["error_detail"] and "column" in result["error_detail"]
 
     def test_truncated_json(self):
         assert run('{"a": ', PERSON_SCHEMA)["error_type"] == "invalid_json"
@@ -176,7 +176,7 @@ class TestSchemaSyntaxErrors:
     def test_invalid_schema_json_reports_position(self):
         result = run(PERSON_JSON, '{"type": "object",}')
         assert result["error_type"] == "invalid_schema_json"
-        assert result["error"].startswith("Invalid JSON Schema:")
+        assert result["error_detail"].startswith("Invalid JSON Schema:")
 
     def test_schema_json_error_takes_precedence_over_data_error(self):
         # Both strings are broken: the data stays valid enough to parse first,
@@ -189,7 +189,7 @@ class TestSchemaStructureErrors:
     def test_non_numeric_type(self):
         result = run('{"a": 1}', '{"type": "nope"}')
         assert result["error_type"] == "schema_error"
-        assert result["error"].startswith("Schema itself is invalid:")
+        assert result["error_detail"].startswith("Schema itself is invalid:")
         assert result["schema_path"]
 
     def test_wrong_keyword_type(self):
@@ -199,7 +199,7 @@ class TestSchemaStructureErrors:
     def test_schema_is_not_an_object(self):
         result = run('{"a": 1}', '"just-a-string"')
         assert result["error_type"] == "schema_error"
-        assert "object or a boolean" in result["error"]
+        assert "object or a boolean" in result["error_detail"]
 
     def test_non_string_dollar_schema(self):
         result = run('{"a": 1}', '{"$schema": 42, "type": "object"}')
@@ -224,7 +224,7 @@ class TestRefResolution:
         schema = json.dumps({"$ref": "#/$defs/Missing"})
         result = run('{"a": 1}', schema)
         assert result["error_type"] == "ref_resolution_error"
-        assert result["error"].startswith("Schema $ref resolution failed:")
+        assert result["error_detail"].startswith("Schema $ref resolution failed:")
 
     def test_external_ref_is_not_fetched(self):
         schema = json.dumps({"$ref": "http://example.com/schemas/foo.json"})
@@ -253,7 +253,7 @@ class TestRefResolution:
         result = run('{"a": 1}', '{"$ref": "#"}')
         assert result["is_valid"] is False
         assert result["error_type"] == "internal_error"
-        assert "circular $ref" in result["error"]
+        assert "circular $ref" in result["error_detail"]
 
 
 class TestDraftSupport:
@@ -296,7 +296,7 @@ class TestDraftSupport:
         assert run('{"a": 7}', draft_four)["is_valid"] is True
         failed = run('{"a": 7}', draft_seven)
         assert failed["error_type"] == "validation_failed"
-        assert failed["path"] == ["a"]
+        assert failed["absolute_path"] == ["a"]
 
     def test_generic_pointer_defaults_to_latest(self):
         schema = json.dumps({"$schema": "http://json-schema.org/schema#", "type": "object"})
@@ -314,8 +314,8 @@ class TestDraftSupport:
         schema = json.dumps({"$schema": declared, "type": "object"})
         result = run('{"a": 1}', schema)
         assert result["error_type"] == "unsupported_draft"
-        assert declared in result["error"]
-        assert "Supported drafts:" in result["error"]
+        assert declared in result["error_detail"]
+        assert "Supported drafts:" in result["error_detail"]
 
     def test_resolve_draft_returns_class_for_known(self):
         validator_cls = resolve_draft({"$schema": "http://json-schema.org/draft-07/schema#"})
@@ -396,12 +396,12 @@ class TestDeepNesting:
     def test_deeply_nested_json_is_reported_not_raised(self):
         result = run("[" * 20000 + "]" * 20000, '{"type": "array"}')
         assert result["error_type"] == "invalid_json"
-        assert "nested too deeply" in result["error"]
+        assert "nested too deeply" in result["error_detail"]
 
     def test_deeply_nested_schema_text_is_reported_not_raised(self):
         result = run('{"n": {}}', self._nested_schema_text(2000))
         assert result["error_type"] == "invalid_schema_json"
-        assert "nested too deeply" in result["error"]
+        assert "nested too deeply" in result["error_detail"]
 
     def test_schema_past_the_default_limit_is_reported_not_raised(self):
         # ~95 levels is where the default limit runs out; the schema is the
@@ -409,13 +409,13 @@ class TestDeepNesting:
         result = run('{"n": {}}', self._nested_schema_text(300))
         assert result["is_valid"] is False
         assert result["error_type"] == "schema_error"
-        assert "nested too deeply" in result["error"]
+        assert "nested too deeply" in result["error_detail"]
 
     def test_data_past_the_default_limit_is_reported_not_raised(self):
         result = run(self._nested_data_text(400), self.RECURSIVE_SCHEMA)
         assert result["is_valid"] is False
         assert result["error_type"] == "internal_error"
-        assert "nested too deeply" in result["error"]
+        assert "nested too deeply" in result["error_detail"]
 
 
 class TestDraftUriScoping:
@@ -441,12 +441,12 @@ class TestInputRepresentability:
     def test_unrepresentable_input_is_reported_clearly(self):
         result = run(object(), '{"type": "object"}')
         assert result["error_type"] == "invalid_input"
-        assert "cannot be converted to a JSON string" in result["error"]
+        assert "cannot be converted to a JSON string" in result["error_detail"]
 
     def test_unrepresentable_schema_is_reported_clearly(self):
         result = run('{"a": 1}', object())
         assert result["error_type"] == "invalid_input"
-        assert "schema_input cannot be converted" in result["error"]
+        assert "schema_input cannot be converted" in result["error_detail"]
 
 
 class TestNoInputPreprocessing:
@@ -473,7 +473,7 @@ class TestNoInputPreprocessing:
         result = run(fenced, PERSON_SCHEMA)
         assert result["is_valid"] is False
         assert result["error_type"] == "invalid_json"
-        assert result["error"].startswith("Invalid JSON input:")
+        assert result["error_detail"].startswith("Invalid JSON input:")
 
     def test_fenced_json_with_valid_body_still_rejected(self):
         # The body would pass validation if it were extracted; the point is
@@ -507,8 +507,9 @@ class TestFormatting:
             {
                 "is_valid": False,
                 "error_type": "validation_failed",
-                "error": "'age' is a required property",
-                "path": ["user"],
+                "error_detail": "'age' is a required property",
+                "absolute_path": ["user"],
+                "json_path": "$.user",
                 "schema_path": ["properties", "user", "required"],
             }
         )

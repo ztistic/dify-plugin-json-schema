@@ -242,6 +242,7 @@ def validate_json_input(
     raise ValidationFailure(
         "validation_failed",
         error.message,
-        path=error.absolute_path,
+        absolute_path=error.absolute_path,
         schema_path=error.absolute_schema_path,
+        json_path="".join(error.json_path),
     )

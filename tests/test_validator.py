@@ -73,10 +73,11 @@ class TestToolMessages:
         payload = json_of(messages)
         assert payload["is_valid"] is False
         assert payload["error_type"] == "validation_failed"
-        assert payload["error"] == "'age' is a required property"
-        assert payload["path"] == []
+        assert payload["error_detail"] == "'age' is a required property"
+        assert payload["absolute_path"] == []
+        assert payload["json_path"] == "$"
         assert payload["schema_path"] == ["required"]
-        assert set(payload) == {"is_valid", "error_type", "error", "path", "schema_path"}
+        assert set(payload) == {"is_valid", "error_type", "error_detail", "absolute_path", "json_path", "schema_path"}
 
     def test_failure_text_includes_error_type(self):
         messages = invoke(json_input='{"age": -1}', schema_input=PERSON_SCHEMA)
@@ -93,7 +94,7 @@ class TestSyntaxErrorMessages:
         messages = invoke(json_input='{"a": }', schema_input=PERSON_SCHEMA)
         payload = json_of(messages)
         assert payload["error_type"] == "invalid_json"
-        assert "line" in payload["error"]
+        assert "line" in payload["error_detail"]
 
     def test_invalid_schema_json(self):
         messages = invoke(json_input='{"age": 1}', schema_input='{"a": }')
@@ -116,8 +117,9 @@ class TestOutputVariables:
         assert variables_of(messages) == {
             "is_valid": False,
             "error_type": "validation_failed",
-            "error": "'age' is a required property",
-            "path": [],
+            "error_detail": "'age' is a required property",
+            "absolute_path": [],
+            "json_path": "$",
             "schema_path": ["required"],
         }
 
