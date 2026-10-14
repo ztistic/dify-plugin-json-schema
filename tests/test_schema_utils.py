@@ -51,7 +51,6 @@ class TestValidationSuccess:
     def test_simple_object(self):
         assert run(PERSON_JSON, PERSON_SCHEMA) == {
             "is_valid": True,
-            "message": "Validation passed.",
         }
 
     def test_nested_object_and_array(self):
@@ -498,9 +497,7 @@ class TestFormatting:
         assert format_path(["users", 0, "name"]) == "$.users[0].name"
 
     def test_success_summary(self):
-        assert format_summary({"is_valid": True, "message": "Validation passed."}) == (
-            "Validation passed."
-        )
+        assert format_summary({"is_valid": True}) == "Validation passed."
 
     def test_failure_summary_contains_type_and_paths(self):
         summary = format_summary(

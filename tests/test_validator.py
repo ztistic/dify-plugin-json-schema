@@ -51,10 +51,7 @@ class TestToolMessages:
         assert messages[0].type == InvokeMessage.MessageType.TEXT
         assert messages[1].type == InvokeMessage.MessageType.JSON
         assert text_of(messages) == "Validation passed."
-        assert json_of(messages) == {
-            "is_valid": True,
-            "message": "Validation passed.",
-        }
+        assert json_of(messages) == {"is_valid": True}
 
     def test_text_and_json_come_first(self):
         # Downstream helpers rely on message order: summary, payload, then
@@ -107,10 +104,7 @@ class TestOutputVariables:
 
     def test_success_variables(self):
         messages = invoke(json_input='{"age": 30}', schema_input=PERSON_SCHEMA)
-        assert variables_of(messages) == {
-            "is_valid": True,
-            "message": "Validation passed.",
-        }
+        assert variables_of(messages) == {"is_valid": True}
 
     def test_failure_variables(self):
         messages = invoke(json_input='{"name": "Alice"}', schema_input=PERSON_SCHEMA)

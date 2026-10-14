@@ -38,9 +38,6 @@ output_schema:
     is_valid:
       type: boolean
       description: Whether the input satisfies the schema
-    message:
-      type: string
-      description: '"Validation passed."; present on success'
     error_type:
       type: string
       description: Failure category; present on failure (invalid_input, invalid_json, invalid_schema_json, schema_error, unsupported_draft, ref_resolution_error, validation_failed, internal_error)

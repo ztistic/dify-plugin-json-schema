@@ -49,7 +49,7 @@ class ValidationFailure(Exception):
 
 def ok_result() -> dict[str, Any]:
     """Build the payload for a successful validation."""
-    return {"is_valid": True, "message": "Validation passed."}
+    return {"is_valid": True}
 
 
 def unexpected_failure_result(escaped: BaseException) -> dict[str, Any]:
@@ -111,7 +111,7 @@ def format_path(path: Any) -> str:
 def format_summary(result: dict[str, Any]) -> str:
     """Render a validation result as the tool's human-readable text output."""
     if result.get("is_valid"):
-        return str(result.get("message") or "Validation passed.")
+        return "Validation passed."
     return (
         f"Validation failed [{result.get('error_type')}]: {result.get('error_detail')}\n"
         f"JSON path: {format_path(result.get('absolute_path'))}\n"

@@ -94,7 +94,6 @@ instead of propagating. The fields below are declared in the tool's
 | Field         | Type    | Present    | Description                                                                                                                         |
 |---------------|---------|------------|-------------------------------------------------------------------------------------------------------------------------------------|
 | `is_valid`    | boolean | always     | Whether the input satisfies the schema                                                                                              |
-| `message`     | string  | on success | `"Validation passed."`                                                                                                              |
 | `error_type`  | string  | on failure | Failure category, see below                                                                                                         |
 | `error_detail`  | string  | on failure | Human-readable explanation, safe to feed back into a retry prompt                                                                   |
 | `absolute_path` | array   | on failure | Location in the JSON that failed, e.g. `["tags", 2]` — always present, empty when not applicable                                    |
