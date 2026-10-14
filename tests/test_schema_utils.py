@@ -6,7 +6,6 @@ import pytest
 
 from utils.failures import (
     ValidationFailure,
-    format_path,
     format_summary,
     ok_result,
     unexpected_failure_result,
@@ -89,19 +88,35 @@ class TestValidationFailure:
         assert result["error_type"] == "validation_failed"
         assert "is not of type" in result["error_detail"]
         assert result["json_path"] == "$.age"
-        assert result["schema_json_path"] == "$.properties.age.type"
+        assert result["absolute_path"] == ["age"]
+        assert result["absolute_schema_path"] == ["properties", "age", "type"]
 
     def test_missing_required_property(self):
         result = run(json.dumps({"name": "Alice"}), PERSON_SCHEMA)
         assert result["error_type"] == "validation_failed"
         assert result["error_detail"] == "'age' is a required property"
-        assert result["schema_json_path"] == "$.required"
+        assert result["absolute_schema_path"] == ["required"]
 
     def test_value_below_minimum(self):
         result = run(json.dumps({"name": "Alice", "age": -1}), PERSON_SCHEMA)
         assert result["error_type"] == "validation_failed"
         assert result["json_path"] == "$.age"
-        assert result["schema_json_path"] == "$.properties.age.minimum"
+        assert result["absolute_path"] == ["age"]
+        assert result["absolute_schema_path"] == ["properties", "age", "minimum"]
+
+    def test_non_identifier_key_is_bracket_quoted(self):
+        # Keys that are not plain identifiers are wrapped in bracket notation
+        # so the rendered path stays parseable.
+        schema = json.dumps(
+            {
+                "type": "object",
+                "required": ["a b"],
+                "properties": {"a b": {"type": "string"}},
+            }
+        )
+        result = run(json.dumps({"a b": 1}), schema)
+        assert result["json_path"] == "$['a b']"
+        assert result["absolute_path"] == ["a b"]
 
     def test_nested_path_is_reported_as_list(self):
         schema = json.dumps(
@@ -118,7 +133,8 @@ class TestValidationFailure:
         )
         result = run(json.dumps({"user": {}}), schema)
         assert result["json_path"] == "$.user"
-        assert result["schema_json_path"] == "$.properties.user.required"
+        assert result["absolute_path"] == ["user"]
+        assert result["absolute_schema_path"] == ["properties", "user", "required"]
 
     def test_array_index_appears_in_path(self):
         schema = json.dumps(
@@ -129,6 +145,7 @@ class TestValidationFailure:
         )
         result = run(json.dumps({"tags": ["ok", 3]}), schema)
         assert result["json_path"] == "$.tags[1]"
+        assert result["absolute_path"] == ["tags", 1]
 
     def test_boolean_false_schema_fails(self):
         result = run('{"a": 1}', "false")
@@ -189,7 +206,7 @@ class TestSchemaStructureErrors:
         result = run('{"a": 1}', '{"type": "nope"}')
         assert result["error_type"] == "schema_error"
         assert result["error_detail"].startswith("Schema itself is invalid:")
-        assert result["schema_json_path"]
+        assert result["absolute_schema_path"]
 
     def test_wrong_keyword_type(self):
         result = run('{"a": 1}', '{"required": "name"}')
@@ -490,12 +507,6 @@ class TestNoInputPreprocessing:
 
 
 class TestFormatting:
-    def test_format_path_root(self):
-        assert format_path([]) == "$"
-
-    def test_format_path_mixed(self):
-        assert format_path(["users", 0, "name"]) == "$.users[0].name"
-
     def test_success_summary(self):
         assert format_summary({"is_valid": True}) == "Validation passed."
 
@@ -506,10 +517,10 @@ class TestFormatting:
                 "error_type": "validation_failed",
                 "error_detail": "'age' is a required property",
                 "json_path": "$.user",
-                "schema_json_path": "$.properties.user.required",
+                "absolute_schema_path": ["properties", "user", "required"],
             }
         )
         assert "validation_failed" in summary
         assert "'age' is a required property" in summary
         assert "$.user" in summary
-        assert "$.properties.user.required" in summary
+        assert '["properties", "user", "required"]' in summary

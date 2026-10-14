@@ -90,8 +90,9 @@ text 消息在成功时为提取出的 JSON 字符串，失败时为空。
 | `is_valid`    | boolean | 总是     | 输入是否满足 Schema                                                                                  |
 | `error_type`  | string  | 失败时   | 失败类别，见下表                                                                                     |
 | `error_detail`  | string  | 失败时   | 人类可读的原因，可直接回填重试提示词                                                                 |
-| `json_path`        | string  | 失败时   | JSON 中出错的位置，以 JSONPath 字符串表示，如 `$.tags[1]`——始终存在，不适用时为空                   |
-| `schema_json_path` | string  | 失败时   | Schema 中被违反关键字的位置，以 JSONPath 字符串表示，如 `$.properties.age.minimum`——始终存在，不适用时为空 |
+| `json_path`            | string  | 失败时   | JSON 中出错的位置，以 JSONPath 字符串表示，如 `$.tags[1]` 或 `$['a b']`——始终存在，不适用时为空      |
+| `absolute_path`        | array   | 失败时   | 同一位置的原始路径段，如 `["tags", 1]`——始终存在，不适用时为空                                        |
+| `absolute_schema_path` | array   | 失败时   | Schema 中被违反关键字的位置，以原始路径段表示，如 `["properties", "age", "minimum"]`——始终存在，不适用时为空 |
 
 ##### 错误类型
 
@@ -103,7 +104,7 @@ text 消息在成功时为提取出的 JSON 字符串，失败时为空。
 | `schema_error`         | Schema 本身违反其元 Schema                                               |
 | `unsupported_draft`    | `$schema` 声明了 2020-12 / 2019-09 / 07 / 06 / 04 之外的 Draft           |
 | `ref_resolution_error` | 内联 `$ref` 指针无法解析；远程引用从不拉取                               |
-| `validation_failed`    | JSON 合法、Schema 合法，但数据不匹配；`json_path` 与 `schema_json_path` 指向失败处 |
+| `validation_failed`    | JSON 合法、Schema 合法，但数据不匹配；`json_path`、`absolute_path` 与 `absolute_schema_path` 指向失败处 |
 | `internal_error`       | 预期外失败，如嵌套超出解释器深度                                         |
 
 注意：
@@ -111,7 +112,7 @@ text 消息在成功时为提取出的 JSON 字符串，失败时为空。
 - 校验器不清洗输入：`json_input` 直接交给 `json.loads` 解析，任何本身不是
   合法 JSON 的输入都会报 `invalid_json`。
 - Schema 按原样生效；拒绝未声明属性通过 `additionalProperties: false` 表达。
-- `error_detail`、`json_path`、`schema_json_path` 适合回填到重试提示词中。
+- `error_detail`、`json_path`、`absolute_schema_path` 适合回填到重试提示词中。
 
 ## 限制
 

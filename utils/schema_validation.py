@@ -25,7 +25,7 @@ from jsonschema import (
 from jsonschema.exceptions import SchemaError, ValidationError, best_match
 from referencing.exceptions import Unresolvable
 
-from utils.failures import ValidationFailure, format_path
+from utils.failures import ValidationFailure
 from utils.strings import trim_to_empty
 
 # The draft that is used when a schema does not declare ``$schema``.
@@ -199,7 +199,7 @@ def validate_json_input(
         raise ValidationFailure(
             "schema_error",
             f"Schema itself is invalid: {error.message}",
-            schema_json_path=format_path(error.absolute_schema_path),
+            absolute_schema_path=error.absolute_schema_path,
         )
     except RecursionError:
         # Metaschema validation burns ~10 frames per nesting level, so a schema
@@ -224,7 +224,7 @@ def validate_json_input(
         raise ValidationFailure(
             "schema_error",
             f"Schema itself is invalid: {structural_error.message}",
-            schema_json_path=format_path(structural_error.absolute_schema_path),
+            absolute_schema_path=structural_error.absolute_schema_path,
         )
     except RecursionError:
         # Either the data is genuinely too deep, or the schema loops on itself
@@ -242,6 +242,7 @@ def validate_json_input(
     raise ValidationFailure(
         "validation_failed",
         error.message,
-        json_path="".join(error.json_path),
-        schema_json_path=format_path(error.absolute_schema_path),
+        json_path=error.json_path,
+        absolute_path=error.absolute_path,
+        absolute_schema_path=error.absolute_schema_path,
     )
