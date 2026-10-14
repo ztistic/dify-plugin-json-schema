@@ -6,8 +6,7 @@ downstream branches can act on.
 
 **Author:** [EFT](https://github.com/ztistic)
 **Repo:** [dify-plugin-json-schema](https://github.com/ztistic/dify-plugin-json-schema)
-**Version:** 1.0.0
-**Type:** tool
+**Version:** 1.0.0 **Type:** tool
 
 ## Why
 
@@ -41,8 +40,8 @@ LLM node -> JSON Extract -> JSON Validate -> branch on the results
 
 ### JSON Extract
 
-| Parameter | Type   | Required | Description                                       |
-|-----------|--------|----------|---------------------------------------------------|
+| Parameter | Type   | Required | Description                                          |
+|-----------|--------|----------|------------------------------------------------------|
 | `text`    | string | yes      | Text containing JSON, typically the output of an LLM |
 
 Two unambiguous shapes are recognized, tried in order:
@@ -60,30 +59,30 @@ payload, and an unexpected internal error is reported as `internal_error`
 instead of propagating. The fields below are declared in the tool's
 `output_schema`, so downstream nodes see them as typed variables.
 
-| Field        | Type    | Present    | Description                                  |
-|--------------|---------|------------|----------------------------------------------|
-| `found`      | boolean | always     | Whether a parseable JSON string was extracted |
-| `json`       | string  | on success | The extracted JSON text, verbatim — feed it to the validator |
-| `error_type` | string  | on failure | Failure category, see below                  |
-| `error`      | string  | on failure | Human-readable explanation                   |
+| Field          | Type    | Present    | Description                                                  |
+|----------------|---------|------------|--------------------------------------------------------------|
+| `found`        | boolean | always     | Whether a parseable JSON string was extracted                |
+| `json_text`    | string  | on success | The extracted JSON text, verbatim — feed it to the validator |
+| `error_type`   | string  | on failure | Failure category, see below                                  |
+| `error_detail` | string  | on failure | Human-readable explanation                                   |
 
 The text message carries the extracted JSON string on success, and is empty
 on failure.
 
 ##### Error Types
 
-| `error_type`    | Meaning                                          |
-|-----------------|--------------------------------------------------|
-| `invalid_input` | `text` missing or blank                          |
-| `no_json_found` | Not JSON as a whole; no parseable json fence     |
-| `internal_error`| Unexpected failure, e.g. input nested too deeply |
+| `error_type`     | Meaning                                          |
+|------------------|--------------------------------------------------|
+| `invalid_input`  | `text` missing or blank                          |
+| `no_json_found`  | Not JSON as a whole; no parseable json fence     |
+| `internal_error` | Unexpected failure, e.g. input nested too deeply |
 
 ### JSON Validate
 
-| Parameter      | Type   | Required | Description                                      |
-|----------------|--------|----------|--------------------------------------------------|
-| `json_input`   | string | yes      | JSON string to validate — typically the extractor's `json` |
-| `schema_input` | string | yes      | JSON Schema; only inline `$ref` pointers resolve |
+| Parameter      | Type   | Required | Description                                                     |
+|----------------|--------|----------|-----------------------------------------------------------------|
+| `json_input`   | string | yes      | JSON string to validate — typically the extractor's `json_text` |
+| `schema_input` | string | yes      | JSON Schema; only inline `$ref` pointers resolve                |
 
 #### Outputs
 
@@ -92,27 +91,27 @@ payload, and an unexpected internal error is reported as `internal_error`
 instead of propagating. The fields below are declared in the tool's
 `output_schema`, so downstream nodes see them as typed variables.
 
-| Field         | Type    | Present    | Description                                   |
-|---------------|---------|------------|-----------------------------------------------|
-| `is_valid`    | boolean | always     | Whether the input satisfies the schema        |
-| `message`     | string  | on success | `"Validation passed."`                        |
-| `error_type`  | string  | on failure | Failure category, see below                   |
-| `error`       | string  | on failure | Human-readable explanation, safe to feed back into a retry prompt |
-| `path`        | array   | on failure | Location in the JSON that failed, e.g. `["tags", 2]` — always present, empty when not applicable |
+| Field         | Type    | Present    | Description                                                                                                                         |
+|---------------|---------|------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| `is_valid`    | boolean | always     | Whether the input satisfies the schema                                                                                              |
+| `message`     | string  | on success | `"Validation passed."`                                                                                                              |
+| `error_type`  | string  | on failure | Failure category, see below                                                                                                         |
+| `error`       | string  | on failure | Human-readable explanation, safe to feed back into a retry prompt                                                                   |
+| `path`        | array   | on failure | Location in the JSON that failed, e.g. `["tags", 2]` — always present, empty when not applicable                                    |
 | `schema_path` | array   | on failure | Location in the schema of the violated keyword, e.g. `["properties", "age", "minimum"]` — always present, empty when not applicable |
 
 ##### Error Types
 
-| `error_type`        | Meaning                                                                |
-|---------------------|------------------------------------------------------------------------|
-| `invalid_input`     | A parameter is missing, blank, or not convertible to JSON text         |
-| `invalid_json`      | `json_input` is not parseable JSON; `error` carries line and column    |
-| `invalid_schema_json` | `schema_input` is not parseable JSON                                 |
-| `schema_error`      | The schema itself violates its metaschema                              |
-| `unsupported_draft` | `$schema` declares a draft other than 2020-12 / 2019-09 / 07 / 06 / 04 |
-| `ref_resolution_error` | An inline `$ref` pointer cannot be resolved; remote refs are never fetched |
-| `validation_failed` | Valid JSON, valid schema — the data does not match; `path` and `schema_path` point at the failure |
-| `internal_error`    | Unexpected failure, e.g. nesting beyond interpreter depth              |
+| `error_type`           | Meaning                                                                                           |
+|------------------------|---------------------------------------------------------------------------------------------------|
+| `invalid_input`        | A parameter is missing, blank, or not convertible to JSON text                                    |
+| `invalid_json`         | `json_input` is not parseable JSON; `error` carries line and column                               |
+| `invalid_schema_json`  | `schema_input` is not parseable JSON                                                              |
+| `schema_error`         | The schema itself violates its metaschema                                                         |
+| `unsupported_draft`    | `$schema` declares a draft other than 2020-12 / 2019-09 / 07 / 06 / 04                            |
+| `ref_resolution_error` | An inline `$ref` pointer cannot be resolved; remote refs are never fetched                        |
+| `validation_failed`    | Valid JSON, valid schema — the data does not match; `path` and `schema_path` point at the failure |
+| `internal_error`       | Unexpected failure, e.g. nesting beyond interpreter depth                                         |
 
 Notes:
 
@@ -160,8 +159,7 @@ run `python -m main`.
 
 ## Icon
 
-The plugin icon is the official JSON Schema logo
-(<https://json-schema.org/logo-blue.svg>).
+The plugin icon is the official JSON Schema logo (<https://json-schema.org/logo-blue.svg>).
 
 ## License
 

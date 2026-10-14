@@ -8,7 +8,7 @@ description:
   human:
     en_US: Extract the first parseable JSON string from text, typically LLM output
     zh_Hans: 从文本（通常是 LLM 的输出）中提取第一段可解析的 JSON 字符串
-  llm: "Extract the first parseable JSON string from a text, typically the output of an LLM. Recognizes two shapes only: the whole text being JSON, or a Markdown ```json (or untagged) fenced code block, whose content is returned verbatim. Bare JSON embedded in prose is not extracted. Returns found and json, or found=false with error_type (invalid_input, no_json_found, internal_error). Pipe the extracted json string into the JSON Schema Validator."
+  llm: "Extract the first parseable JSON string from a text, typically the output of an LLM. Recognizes two shapes only: the whole text being JSON, or a Markdown ```json (or untagged) fenced code block, whose content is returned verbatim. Bare JSON embedded in prose is not extracted. Returns found and json_text, or found=false with error_type (invalid_input, no_json_found, internal_error). Pipe the extracted json string into the JSON Schema Validator."
 parameters:
   - name: text
     type: string
@@ -27,13 +27,13 @@ output_schema:
     found:
       type: boolean
       description: Whether a parseable JSON string was extracted
-    json:
+    json_text:
       type: string
       description: The extracted JSON text, verbatim; present on success
     error_type:
       type: string
       description: Failure category; present on failure (invalid_input, no_json_found, internal_error)
-    error:
+    error_detail:
       type: string
       description: Human-readable failure detail; present on failure
 extra:

@@ -5,8 +5,7 @@
 
 **作者：** [EFT](https://github.com/ztistic)
 **仓库：** [dify-plugin-json-schema](https://github.com/ztistic/dify-plugin-json-schema)
-**版本：** 1.0.0
-**类型：** tool
+**版本：** 1.0.0 **类型：** tool
 
 ## 为什么
 
@@ -39,8 +38,8 @@ LLM 节点 -> JSON 提取 -> JSON 校验 -> 按结果分支
 
 ### JSON 提取
 
-| 参数   | 类型   | 必填 | 说明                             |
-|--------|--------|------|----------------------------------|
+| 参数   | 类型   | 必填 | 说明                                |
+|--------|--------|------|-------------------------------------|
 | `text` | string | 是   | 包含 JSON 的文本，通常是 LLM 的输出 |
 
 只识别两种没有歧义的形态，按以下顺序尝试：
@@ -56,12 +55,12 @@ LLM 节点 -> JSON 提取 -> JSON 校验 -> 按结果分支
 未预期的内部错误也会报为 `internal_error`，而不是继续上抛。
 以下字段已在工具的 `output_schema` 中声明，下游节点可将它们作为类型化变量选用。
 
-| 字段         | 类型    | 何时出现 | 说明                           |
-|--------------|---------|----------|--------------------------------|
-| `found`      | boolean | 总是     | 是否提取到可解析的 JSON 字符串 |
-| `json`       | string  | 成功时   | 提取出的 JSON 文本（逐字）——交给校验器 |
-| `error_type` | string  | 失败时   | 失败类别，见下表               |
-| `error`      | string  | 失败时 | 人类可读的原因说明            |
+| 字段           | 类型    | 何时出现 | 说明                                   |
+|----------------|---------|----------|----------------------------------------|
+| `found`        | boolean | 总是     | 是否提取到可解析的 JSON 字符串         |
+| `json_text`    | string  | 成功时   | 提取出的 JSON 文本（逐字）——交给校验器 |
+| `error_type`   | string  | 失败时   | 失败类别，见下表                       |
+| `error_detail` | string  | 失败时   | 人类可读的原因说明                     |
 
 text 消息在成功时为提取出的 JSON 字符串，失败时为空。
 
@@ -75,10 +74,10 @@ text 消息在成功时为提取出的 JSON 字符串，失败时为空。
 
 ### JSON 校验
 
-| 参数           | 类型   | 必填 | 说明                                  |
-|----------------|--------|------|---------------------------------------|
-| `json_input`   | string | 是   | 待校验的 JSON 字符串——通常是提取器的 `json` |
-| `schema_input` | string | 是   | JSON Schema；仅解析内联 `$ref` 指针   |
+| 参数           | 类型   | 必填 | 说明                                             |
+|----------------|--------|------|--------------------------------------------------|
+| `json_input`   | string | 是   | 待校验的 JSON 字符串——通常是提取器的 `json_text` |
+| `schema_input` | string | 是   | JSON Schema；仅解析内联 `$ref` 指针              |
 
 #### 输出
 
@@ -86,27 +85,27 @@ text 消息在成功时为提取出的 JSON 字符串，失败时为空。
 未预期的内部错误也会报为 `internal_error`，而不是继续上抛。
 以下字段已在工具的 `output_schema` 中声明，下游节点可将它们作为类型化变量选用。
 
-| 字段          | 类型    | 何时出现 | 说明                                       |
-|---------------|---------|----------|--------------------------------------------|
-| `is_valid`    | boolean | 总是     | 输入是否满足 Schema                        |
-| `message`     | string  | 成功时   | `"Validation passed."`                     |
-| `error_type`  | string  | 失败时   | 失败类别，见下表                           |
-| `error`       | string  | 失败时   | 人类可读的原因，可直接回填重试提示词       |
-| `path`        | array   | 失败时   | JSON 中出错的位置，如 `["tags", 2]`——始终存在，不适用时为空 |
-| `schema_path` | array   | 失败时 | Schema 中被违反关键字的位置，如 `["properties", "age", "minimum"]`——失败时始终存在，不适用时为空数组 |
+| 字段          | 类型    | 何时出现 | 说明                                                                                                 |
+|---------------|---------|----------|------------------------------------------------------------------------------------------------------|
+| `is_valid`    | boolean | 总是     | 输入是否满足 Schema                                                                                  |
+| `message`     | string  | 成功时   | `"Validation passed."`                                                                               |
+| `error_type`  | string  | 失败时   | 失败类别，见下表                                                                                     |
+| `error`       | string  | 失败时   | 人类可读的原因，可直接回填重试提示词                                                                 |
+| `path`        | array   | 失败时   | JSON 中出错的位置，如 `["tags", 2]`——始终存在，不适用时为空                                          |
+| `schema_path` | array   | 失败时   | Schema 中被违反关键字的位置，如 `["properties", "age", "minimum"]`——失败时始终存在，不适用时为空数组 |
 
 ##### 错误类型
 
-| `error_type`         | 含义                                                         |
-|----------------------|--------------------------------------------------------------|
-| `invalid_input`      | 参数缺失、为空白或无法转为 JSON 文本                         |
-| `invalid_json`       | `json_input` 不是可解析的 JSON；`error` 带行号列号           |
-| `invalid_schema_json`| `schema_input` 不是可解析的 JSON                             |
-| `schema_error`       | Schema 本身违反其元 Schema                                   |
-| `unsupported_draft`  | `$schema` 声明了 2020-12 / 2019-09 / 07 / 06 / 04 之外的 Draft |
-| `ref_resolution_error` | 内联 `$ref` 指针无法解析；远程引用从不拉取                 |
-| `validation_failed`  | JSON 合法、Schema 合法，但数据不匹配；`path` 与 `schema_path` 指向失败处 |
-| `internal_error`     | 预期外失败，如嵌套超出解释器深度                             |
+| `error_type`           | 含义                                                                     |
+|------------------------|--------------------------------------------------------------------------|
+| `invalid_input`        | 参数缺失、为空白或无法转为 JSON 文本                                     |
+| `invalid_json`         | `json_input` 不是可解析的 JSON；`error` 带行号列号                       |
+| `invalid_schema_json`  | `schema_input` 不是可解析的 JSON                                         |
+| `schema_error`         | Schema 本身违反其元 Schema                                               |
+| `unsupported_draft`    | `$schema` 声明了 2020-12 / 2019-09 / 07 / 06 / 04 之外的 Draft           |
+| `ref_resolution_error` | 内联 `$ref` 指针无法解析；远程引用从不拉取                               |
+| `validation_failed`    | JSON 合法、Schema 合法，但数据不匹配；`path` 与 `schema_path` 指向失败处 |
+| `internal_error`       | 预期外失败，如嵌套超出解释器深度                                         |
 
 注意：
 

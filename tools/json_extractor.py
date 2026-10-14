@@ -5,7 +5,7 @@ from dify_plugin import Tool
 from dify_plugin.entities.tool import ToolInvokeMessage
 
 from utils.extraction import extract_json
-from utils.failures import ValidationFailure, error_fields
+from utils.failures import ValidationFailure
 from utils.strings import get_string
 
 
@@ -19,19 +19,20 @@ class JsonExtractorTool(Tool):
         # never let an exception escape -- every failure is a payload.
         try:
             text = get_string(tool_parameters, "text")
-            result = {"found": True, "json": extract_json(text)}
+            result = {"found": True, "json_text": extract_json(text)}
         except ValidationFailure as failure:
             result = {
                 "found": False,
-                **error_fields(failure.error_type, failure.error),
+                "error_type": failure.error_type,
+                "error_detail": failure.error,
             }
         except Exception as escaped:  # noqa: BLE001 - the tool must never raise
             result = {
                 "found": False,
-                **error_fields(
-                    "internal_error",
+                "error_type": "internal_error",
+                "error_detail": (
                     f"Unexpected error while extracting: "
-                    f"{type(escaped).__name__}: {escaped}",
+                    f"{type(escaped).__name__}: {escaped}"
                 ),
             }
 
@@ -40,7 +41,7 @@ class JsonExtractorTool(Tool):
         yield self.create_text_message(_summary(result))
         yield self.create_json_message(result)
         # Declaring output_schema is not enough: Dify only populates the named
-        # output variables (found, json, error_type, error) if the tool returns
+        # output variables (found, json_text, error_type, error_detail) if the tool returns
         # them via create_variable_message. Without this loop, referencing
         # {{node.found}} in a downstream branch fails with "Variable not found".
         for name, value in result.items():
@@ -55,5 +56,5 @@ def _summary(result: dict[str, Any]) -> str:
     the failure detail lives in the JSON payload only.
     """
     if result.get("found"):
-        return result["json"]
+        return result["json_text"]
     return ""
