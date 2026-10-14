@@ -3,6 +3,7 @@
 import json
 
 import pytest
+from jsonschema import Draft7Validator
 
 from utils.failures import (
     ValidationFailure,
@@ -105,8 +106,8 @@ class TestValidationFailure:
         assert result["absolute_schema_path"] == ["properties", "age", "minimum"]
 
     def test_non_identifier_key_is_bracket_quoted(self):
-        # Keys that are not plain identifiers are wrapped in bracket notation
-        # so the rendered path stays parseable.
+        # The JSONPath is rendered by jsonschema itself, which bracket-quotes
+        # keys that are not plain identifiers.
         schema = json.dumps(
             {
                 "type": "object",
@@ -335,7 +336,7 @@ class TestDraftSupport:
 
     def test_resolve_draft_returns_class_for_known(self):
         validator_cls = resolve_draft({"$schema": "http://json-schema.org/draft-07/schema#"})
-        assert validator_cls is not None
+        assert validator_cls is Draft7Validator
 
 
 
@@ -524,3 +525,61 @@ class TestFormatting:
         assert "'age' is a required property" in summary
         assert "$.user" in summary
         assert '["properties", "user", "required"]' in summary
+
+
+class TestFailurePayloadShape:
+    """Every failure payload carries the same six fields.
+
+    The three path fields are always present -- empty when the failure has no
+    location -- so downstream nodes can branch on them without defensive
+    checks.
+    """
+
+    FAILURE_FIELDS = {
+        "is_valid",
+        "error_type",
+        "error_detail",
+        "json_path",
+        "absolute_path",
+        "absolute_schema_path",
+    }
+
+    # Failures with no location at all: no JSON path, no instance path and no
+    # schema keyword path.
+    NO_LOCATION = [
+        ("", PERSON_SCHEMA, "invalid_input"),
+        ("{", "{}", "invalid_json"),
+        ('{"a": 1}', '{"type":', "invalid_schema_json"),
+        ('{"a": 1}', '{"$ref": "#/$defs/Missing"}', "ref_resolution_error"),
+        (
+            '{"a": 1}',
+            '{"$schema": "http://json-schema.org/draft-03/schema#"}',
+            "unsupported_draft",
+        ),
+    ]
+
+    @pytest.mark.parametrize(
+        "json_input,schema_input,error_type",
+        NO_LOCATION + [
+            # schema_error points into the metaschema and validation_failed
+            # into the instance, so neither is in the list above.
+            ('{"a": 1}', '{"type": "nope"}', "schema_error"),
+            ('{"a": 1}', "false", "validation_failed"),
+        ],
+    )
+    def test_failure_fields_are_always_present(
+        self, json_input, schema_input, error_type
+    ):
+        result = run(json_input, schema_input)
+        assert result["error_type"] == error_type
+        assert set(result) == self.FAILURE_FIELDS
+
+    @pytest.mark.parametrize("json_input,schema_input,error_type", NO_LOCATION)
+    def test_failures_without_a_location_have_empty_paths(
+        self, json_input, schema_input, error_type
+    ):
+        result = run(json_input, schema_input)
+        assert result["error_type"] == error_type
+        assert result["json_path"] == ""
+        assert result["absolute_path"] == []
+        assert result["absolute_schema_path"] == []

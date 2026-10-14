@@ -2,8 +2,6 @@
 
 import json
 
-import pytest
-
 from dify_plugin.entities.invoke_message import InvokeMessage
 from dify_plugin.entities.tool import ToolInvokeMessage
 from tools.json_schema_validator import JsonSchemaValidatorTool
