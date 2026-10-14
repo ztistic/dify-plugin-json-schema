@@ -148,7 +148,7 @@ The plugin runs offline and collects no data. See
 
 ```bash
 python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\pip install -r requirements.txt -r requirements-dev.txt
 .venv\Scripts\python -m pytest -q
 dify plugin package . -o json-schema-1.0.0.difypkg
 ```

@@ -135,7 +135,7 @@ text 消息在成功时为提取出的 JSON 字符串，失败时为空。
 
 ```bash
 python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\pip install -r requirements.txt -r requirements-dev.txt
 .venv\Scripts\python -m pytest -q
 dify plugin package . -o json-schema-1.0.0.difypkg
 ```

@@ -5,8 +5,8 @@ identity:
     en_US: JSON Schema
     zh_Hans: JSON Schema
   description:
-    en_US: Validate LLM structured output against a JSON Schema, with typed error classification for downstream branching.
-    zh_Hans: 依据 JSON Schema 校验大模型结构化输出，并按错误类型输出结构化结果，便于下游条件分支处理。
+    en_US: Extract JSON from LLM output and validate it against a JSON Schema, with typed error classification for downstream branching.
+    zh_Hans: 从大模型输出中提取 JSON 并依据 JSON Schema 校验，按错误类型输出结构化结果，便于下游条件分支处理。
   icon: icon.svg
 tools:
   - tools/json_schema_validator.yaml

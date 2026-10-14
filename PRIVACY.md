@@ -1,12 +1,12 @@
 # Privacy Policy for JSON Schema Plugin
 
-**Last Updated: October 12, 2026**
+**Last Updated: October 15, 2026**
 
 ## Overview
 
 This privacy policy explains how the JSON Schema Plugin for Dify ("the
-Plugin") handles data when you use it to validate JSON documents against a
-JSON Schema.
+Plugin") handles data when you use its tools to extract JSON from text and to
+validate that JSON against a JSON Schema.
 
 ## Data Collection
 
@@ -15,15 +15,15 @@ The Plugin does **not** collect, store, log, or transmit any personal data.
 The Plugin only processes the following data during operation, solely to
 perform its function:
 
-1. **Input data**: the JSON string and the JSON Schema string you provide to
-   the validation tool — used only to produce the validation result for the
-   current request.
+1. **Input data**: the text you provide to the extraction tool, and the JSON
+   string and JSON Schema string you provide to the validation tool — used
+   only to produce the result for the current request.
 
 ## Data Processing
 
-- Validation happens entirely in-memory inside the Plugin's execution
-  environment.
-- Both inputs are parsed, validated, and discarded within the same request.
+- Extraction and validation happen entirely in-memory inside the Plugin's
+  execution environment.
+- All inputs are parsed, processed, and discarded within the same request.
 - The Plugin keeps no copy of any data after the operation completes.
 - Remote `$ref` references are intentionally not fetched: no outbound request
   is ever made as a result of validating a schema.
