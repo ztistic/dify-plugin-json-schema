@@ -19,7 +19,9 @@ broken answer becomes a typed, branchable result instead of a silent failure.
 ## Features
 
 - **JSON Extract** — pulls the first parseable JSON string out of a text,
-  typically a raw LLM answer. No guessing, no cleanup, no repair.
+  typically a raw LLM answer. Whole-input JSON and code fences are recognized
+  by default; a JSON object or array embedded in surrounding prose is found
+  only when `scan_embedded` is on. No guessing, no cleanup, no repair.
 - **JSON Validate** — validates a JSON string against a JSON Schema (drafts
   2020-12 / 2019-09 / 07 / 06 / 04) and classifies every failure into a
   typed `error_type`.
