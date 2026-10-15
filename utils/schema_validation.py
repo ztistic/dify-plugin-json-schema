@@ -26,6 +26,7 @@ from jsonschema.exceptions import SchemaError, ValidationError, best_match
 from referencing.exceptions import Unresolvable
 
 from utils.failures import ValidationFailure
+from utils.strict_json import loads_strict
 from utils.strings import trim_to_empty
 
 # The draft that is used when a schema does not declare ``$schema``.
@@ -57,8 +58,8 @@ _GENERIC_POINTER_PATTERN = re.compile(r"json-schema\.org/schema/?#?$", re.IGNORE
 _JSON_SCHEMA_ORG_PATTERN = re.compile(r"^https?://(?:www\.)?json-schema\.org/", re.IGNORECASE)
 _BARE_DRAFT_PATTERN = re.compile(r"^draft[-/](\d{4}-\d{2}|0?\d)$", re.IGNORECASE)
 
-# ``draft-07`` / ``draft/2020-12`` / ``draft3`` -- the numeric part is enough
-# to pick a validator class.
+# ``draft-07`` / ``draft/2020-12`` -- the separator between "draft" and the
+# version is required; the numeric part is enough to pick a validator class.
 _DRAFT_VERSION_PATTERN = re.compile(r"draft[-/](\d{4}-\d{2}|0?\d)", re.IGNORECASE)
 
 # Every unresolvable ``$ref`` surfaces as jsonschema's ``_WrappedReferencingError``,
@@ -71,14 +72,15 @@ _DRAFT_VERSION_PATTERN = re.compile(r"draft[-/](\d{4}-\d{2}|0?\d)", re.IGNORECAS
 def _loads(raw: str, error_type: str, label: str) -> Any:
     """Parse JSON text.
 
-    Strictly ``json.loads`` and nothing else. The plugin validates, it does not
+    Strictly ``json.loads`` and nothing else, with the non-standard
+    ``NaN``/``Infinity`` constants rejected. The plugin validates, it does not
     prepare input: anything that is not already valid JSON -- including a
     Markdown code fence around it -- is raised as :class:`ValidationFailure`
     with ``error_type`` so the caller fixes the value the downstream nodes
     will actually receive.
     """
     try:
-        return json.loads(raw)
+        return loads_strict(raw)
     except json.JSONDecodeError as error:
         raise ValidationFailure(error_type, f"{label}: {_describe_decode_error(error)}")
     except RecursionError:

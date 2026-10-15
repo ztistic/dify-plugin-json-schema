@@ -77,8 +77,10 @@ Three shapes are tried in order, and the first hit is returned:
 
 Every candidate is decoded before it is accepted, and the returned string is
 a verbatim slice of the input (surrounding whitespace trimmed) — never
-re-serialized. Text holding none of the checked shapes is reported as
-`no_json_found`; the detail states whether the embedded scan was off.
+re-serialized. Decoding is strict: the non-standard constants `NaN` and
+`Infinity` are not valid JSON and are rejected. Text holding none of the
+checked shapes is reported as `no_json_found`; the detail states whether the
+embedded scan was off.
 
 #### Outputs
 
@@ -151,6 +153,8 @@ Notes:
 - The validator does not clean its input: `json_input` goes straight to
   `json.loads`, and anything not already valid JSON is reported as
   `invalid_json`.
+- Decoding is strict: the non-standard constants `NaN` and `Infinity` are
+  rejected as `invalid_json` / `invalid_schema_json`.
 - The schema is applied exactly as written; undeclared properties are rejected
   only where the schema declares `additionalProperties: false`.
 - `error_detail`, `json_path` and `absolute_schema_path` are suitable for

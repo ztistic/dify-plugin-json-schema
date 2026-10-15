@@ -143,6 +143,31 @@ class TestNoJsonFound:
         assert excinfo.value.error_type == "no_json_found"
 
 
+class TestStrictConstants:
+    """``NaN`` and ``Infinity`` are not JSON, whatever Python's json module
+    accepts by default."""
+
+    def test_bare_nan_is_rejected(self):
+        with pytest.raises(ValidationFailure) as excinfo:
+            extract_json("NaN")
+        assert excinfo.value.error_type == "no_json_found"
+
+    def test_nan_inside_an_object_is_rejected(self):
+        with pytest.raises(ValidationFailure) as excinfo:
+            extract_json('{"a": NaN}')
+        assert excinfo.value.error_type == "no_json_found"
+
+    def test_infinity_is_rejected_by_the_embedded_scan(self):
+        with pytest.raises(ValidationFailure) as excinfo:
+            extract_json("[1, Infinity]", scan_embedded=True)
+        assert excinfo.value.error_type == "no_json_found"
+
+    def test_nan_inside_a_fence_is_rejected(self):
+        with pytest.raises(ValidationFailure) as excinfo:
+            extract_json('```json\n{"a": -Infinity}\n```')
+        assert excinfo.value.error_type == "no_json_found"
+
+
 class TestInputErrors:
     def test_blank_input(self):
         with pytest.raises(ValidationFailure) as excinfo:

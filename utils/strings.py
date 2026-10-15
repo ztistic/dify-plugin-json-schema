@@ -31,7 +31,7 @@ def stringify(value: Any) -> str:
         text = value
     else:
         try:
-            text = json.dumps(value, ensure_ascii=False)
+            text = json.dumps(value, ensure_ascii=False, allow_nan=False)
         except (TypeError, ValueError, RecursionError):
             raise ValidationFailure(
                 "invalid_input", "cannot be converted to a JSON string"

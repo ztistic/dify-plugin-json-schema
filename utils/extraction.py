@@ -9,8 +9,10 @@ It tries three shapes in order and returns the first hit:
    ``scan_embedded`` is on.
 
 Every candidate is decoded before it is accepted, so the returned string is
-always valid JSON. Shape 3 seeds its scan at ``{`` and ``[``, which keeps bare
-numbers, strings and literals in prose from being mistaken for a result.
+always valid JSON; decoding is strict, so the non-standard ``NaN`` and
+``Infinity`` constants are rejected. Shape 3 seeds its scan at ``{`` and
+``[``, which keeps bare numbers, strings and literals in prose from being
+mistaken for a result.
 Whether the extracted JSON has the right structure is the JSON Schema
 Validator's business, not this module's.
 """
@@ -21,6 +23,7 @@ import json
 import re
 
 from utils.failures import ValidationFailure
+from utils.strict_json import loads_strict, strict_decoder
 from utils.strings import trim_to_empty
 
 # Matches a fenced code block (```lang, newline, content, ```). The regex only
@@ -87,7 +90,7 @@ def _scan_containers(text: str) -> str | None:
     candidate. Each candidate must decode before it is accepted, and one that
     fails to decode moves the scan to the next opener.
     """
-    decoder = json.JSONDecoder()
+    decoder = strict_decoder()
     cursor = 0
     while True:
         opener = _CONTAINER_OPENERS.search(text, cursor)
@@ -112,7 +115,7 @@ def _is_parseable(candidate: str) -> bool:
     genuine JSON, just beyond what the interpreter stack admits.
     """
     try:
-        json.loads(candidate)
+        loads_strict(candidate)
     except json.JSONDecodeError:
         return False
     except RecursionError:

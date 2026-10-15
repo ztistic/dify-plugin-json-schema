@@ -189,6 +189,26 @@ class TestJsonSyntaxErrors:
         assert run("not json at all", PERSON_SCHEMA)["error_type"] == "invalid_json"
 
 
+class TestNonStandardConstants:
+    """``NaN`` and ``Infinity`` are rejected everywhere: instance text, schema
+    text, and parameter stringification."""
+
+    def test_nan_in_instance_is_invalid_json(self):
+        result = run('{"a": NaN}', PERSON_SCHEMA)
+        assert result["error_type"] == "invalid_json"
+        assert "NaN" in result["error_detail"]
+
+    def test_infinity_in_schema_is_invalid_schema_json(self):
+        result = run(PERSON_JSON, '{"const": Infinity}')
+        assert result["error_type"] == "invalid_schema_json"
+        assert "Infinity" in result["error_detail"]
+
+    def test_nan_value_cannot_be_stringified(self):
+        result = run(float("nan"), '{"type": "number"}')
+        assert result["error_type"] == "invalid_input"
+        assert "cannot be converted" in result["error_detail"]
+
+
 class TestSchemaSyntaxErrors:
     def test_invalid_schema_json_reports_position(self):
         result = run(PERSON_JSON, '{"type": "object",}')

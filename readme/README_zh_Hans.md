@@ -68,7 +68,8 @@ LLM 节点 -> JSON 提取 -> JSON 校验 -> 按结果分支
    和字面量不会成为候选；其它语言围栏或未闭合围栏中的 JSON 在此形态下可达。
 
 每个候选都先解析成功才被采纳；返回的字符串是输入的逐字切片（首尾空白除外），
-不会重新序列化。已检查的形态都取不到时按 `no_json_found` 处理，错误详情会说明
+不会重新序列化。解析是严格的：非标准常量 `NaN`、`Infinity` 不属于合法 JSON，
+会被拒绝。已检查的形态都取不到时按 `no_json_found` 处理，错误详情会说明
 内嵌扫描是否处于关闭状态。
 
 #### 输出
@@ -136,6 +137,8 @@ text 消息成功时为 `Validation passed.`，失败时为带 JSON 路径与 Sc
 
 - 校验器不清洗输入：`json_input` 直接交给 `json.loads` 解析，任何本身不是
   合法 JSON 的输入都会报 `invalid_json`。
+- 解析是严格的：非标准常量 `NaN`、`Infinity` 按 `invalid_json` /
+  `invalid_schema_json` 拒绝。
 - Schema 按原样生效；仅在 Schema 声明 `additionalProperties: false` 的位置
   拒绝未声明属性。
 - `error_detail`、`json_path`、`absolute_schema_path` 适合回填到重试提示词中。
