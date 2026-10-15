@@ -1,15 +1,17 @@
 """Deterministic JSON extraction from raw LLM output.
 
 The extractor answers exactly one question: where is the JSON in this text?
-It recognizes two unambiguous shapes and nothing else:
+It tries three shapes in order and returns the first hit:
 
 1. the whole input already is JSON;
-2. a ```json / ``` fenced code block.
+2. a ```json / ``` fenced code block whose content is JSON;
+3. the first JSON object or array embedded anywhere in the text.
 
-Bare JSON embedded in prose is deliberately NOT extracted: scanning free text
-for balanced brackets cannot be done without guessing, and this plugin
-reports honestly instead of guessing. Whether the extracted text has the
-right structure is the JSON Schema Validator's business, not this module's.
+Every candidate is decoded before it is accepted, so the returned string is
+always valid JSON. Step 3 seeds its scan at ``{`` and ``[``, which keeps bare
+numbers, strings and literals in prose from being mistaken for a result.
+Whether the extracted JSON has the right structure is the JSON Schema
+Validator's business, not this module's.
 """
 
 from __future__ import annotations
@@ -25,8 +27,15 @@ from utils.strings import trim_to_empty
 _FENCE_PATTERN = re.compile(r"```([^\n`]*)[ \t]*\n(.*?)```", re.DOTALL)
 
 # Only these fence language tags are trusted to hold JSON. A fence tagged
-# ``python`` or ``bash`` is skipped rather than gambled on.
+# ``python`` or ``bash`` is not preferred over step 3, but its content is still
+# reachable there once it decodes as JSON.
 _JSON_FENCE_LANGUAGES = frozenset({"", "json"})
+
+# Step 3 seeds its scan at object and array openers only.
+_CONTAINER_OPENERS = re.compile(r"[{\[]")
+
+# Shared detail for a candidate nested beyond what the interpreter admits.
+_TOO_DEEP_DETAIL = "The input is nested too deeply to be parsed"
 
 
 def extract_json(text: str) -> str:
@@ -48,11 +57,39 @@ def extract_json(text: str) -> str:
         fenced = trim_to_empty(match.group(2))
         if fenced and _is_parseable(fenced):
             return fenced
+    embedded = _scan_containers(text)
+    if embedded is not None:
+        return embedded
     raise ValidationFailure(
         "no_json_found",
-        "No parseable JSON found: the input is not JSON, and it contains no "
-        "parseable ```json code block",
+        "No parseable JSON found: the input is not JSON, it contains no "
+        "parseable ```json code block, and it carries no JSON object or array",
     )
+
+
+def _scan_containers(text: str) -> str | None:
+    """Return the first JSON object or array embedded in ``text``.
+
+    Seeding the scan at ``{`` and ``[`` is what restricts it to objects and
+    arrays: a bare number, string or literal in prose never becomes a
+    candidate. Each candidate must decode before it is accepted, and one that
+    fails to decode moves the scan to the next opener.
+    """
+    decoder = json.JSONDecoder()
+    cursor = 0
+    while True:
+        opener = _CONTAINER_OPENERS.search(text, cursor)
+        if opener is None:
+            return None
+        start = opener.start()
+        try:
+            _, end = decoder.raw_decode(text, start)
+        except json.JSONDecodeError:
+            cursor = start + 1
+            continue
+        except RecursionError:
+            raise ValidationFailure("internal_error", _TOO_DEEP_DETAIL)
+        return text[start:end]
 
 
 def _is_parseable(candidate: str) -> bool:
@@ -67,8 +104,5 @@ def _is_parseable(candidate: str) -> bool:
     except json.JSONDecodeError:
         return False
     except RecursionError:
-        raise ValidationFailure(
-            "internal_error",
-            "The input is nested too deeply to be parsed",
-        )
+        raise ValidationFailure("internal_error", _TOO_DEEP_DETAIL)
     return True

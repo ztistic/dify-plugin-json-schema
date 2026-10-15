@@ -41,6 +41,40 @@ class TestFence:
         assert "1e3" in extracted
         assert '"x } y"' in extracted
 
+    def test_json_fence_is_preferred_over_reachable_prose(self):
+        text = '{"a": 1}\n\n```json\n{"b": 2}\n```'
+        assert extract_json(text) == '{"b": 2}'
+
+    def test_json_fence_is_preferred_over_an_earlier_other_language_fence(self):
+        text = '```bash\n{"a": 1}\n```\n```json\n{"b": 2}\n```'
+        assert extract_json(text) == '{"b": 2}'
+
+
+class TestProseFallback:
+    def test_bare_object_in_prose(self):
+        assert extract_json('The result is {"a": 1} as shown.') == '{"a": 1}'
+
+    def test_bare_array_in_prose(self):
+        assert extract_json("values: [1, 2] here") == "[1, 2]"
+
+    def test_first_candidate_wins(self):
+        assert extract_json('a {"b": 1} c {"d": 2}') == '{"b": 1}'
+
+    def test_outermost_container_wins_at_a_seed(self):
+        assert extract_json('note {"a": {"b": 1}} end') == '{"a": {"b": 1}}'
+
+    def test_brace_inside_a_string_stays_inside_the_value(self):
+        assert extract_json('see {"s": "x } y"} ok') == '{"s": "x } y"}'
+
+    def test_slice_is_verbatim(self):
+        assert extract_json('out {"n": 1e3,  "s": "y"} done') == '{"n": 1e3,  "s": "y"}'
+
+    def test_other_language_fence_reaches_the_scan(self):
+        assert extract_json('```python\n{"a": 1}\n```') == '{"a": 1}'
+
+    def test_unclosed_fence_reaches_the_scan(self):
+        assert extract_json('```json\n{"a": 1}') == '{"a": 1}'
+
 
 class TestNoJsonFound:
     def test_prose_only(self):
@@ -48,19 +82,14 @@ class TestNoJsonFound:
             extract_json("The answer is 42, no JSON here.")
         assert excinfo.value.error_type == "no_json_found"
 
-    def test_bare_json_in_prose_is_not_extracted(self):
+    def test_scalars_in_prose_are_not_extracted(self):
         with pytest.raises(ValidationFailure) as excinfo:
-            extract_json('The result is {"a": 1} as shown.')
+            extract_json("The value is true and 3.")
         assert excinfo.value.error_type == "no_json_found"
 
-    def test_other_language_fence_is_skipped(self):
+    def test_braces_that_are_not_json_are_skipped(self):
         with pytest.raises(ValidationFailure) as excinfo:
-            extract_json('```python\n{"a": 1}\n```')
-        assert excinfo.value.error_type == "no_json_found"
-
-    def test_unclosed_fence(self):
-        with pytest.raises(ValidationFailure) as excinfo:
-            extract_json('```json\n{"a": 1}')
+            extract_json('import {a} from "x"')
         assert excinfo.value.error_type == "no_json_found"
 
     def test_unparseable_fence(self):

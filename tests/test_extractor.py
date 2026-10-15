@@ -88,8 +88,9 @@ class TestOutputVariables:
             "found": False,
             "error_type": "no_json_found",
             "error_detail": (
-                "No parseable JSON found: the input is not JSON, and it "
-                "contains no parseable ```json code block"
+                "No parseable JSON found: the input is not JSON, it contains "
+                "no parseable ```json code block, and it carries no JSON "
+                "object or array"
             ),
         }
 
