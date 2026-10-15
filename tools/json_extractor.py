@@ -19,7 +19,13 @@ class JsonExtractorTool(Tool):
         # never let an exception escape -- every failure is a payload.
         try:
             text = get_string(tool_parameters, "text")
-            result = {"found": True, "json_text": extract_json(text)}
+            # Shape 3 reads through surrounding prose, so it stays off unless
+            # the parameter asks for it -- only a real boolean True enables it.
+            scan_embedded = tool_parameters.get("scan_embedded") is True
+            result = {
+                "found": True,
+                "json_text": extract_json(text, scan_embedded=scan_embedded),
+            }
         except ValidationFailure as failure:
             result = {
                 "found": False,

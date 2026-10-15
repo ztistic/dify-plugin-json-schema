@@ -58,6 +58,13 @@ class TestToolMessages:
             "json_text": '{"a": 1}',
         }
 
+    def test_embedded_json_needs_the_scan_flag(self):
+        assert json_of(invoke(text='answer: {"a": 1}'))["found"] is False
+        assert json_of(invoke(text='answer: {"a": 1}', scan_embedded=True)) == {
+            "found": True,
+            "json_text": '{"a": 1}',
+        }
+
     def test_miss_payload_has_all_fields(self):
         payload = json_of(invoke(text="no json here"))
         assert payload["found"] is False
@@ -88,9 +95,9 @@ class TestOutputVariables:
             "found": False,
             "error_type": "no_json_found",
             "error_detail": (
-                "No parseable JSON found: the input is not JSON, it contains "
-                "no parseable ```json code block, and it carries no JSON "
-                "object or array"
+                "No parseable JSON found: the input is not JSON, and it "
+                "contains no parseable ```json code block; scan_embedded is "
+                "off, so JSON embedded in surrounding text was not searched for"
             ),
         }
 

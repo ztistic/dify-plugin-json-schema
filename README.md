@@ -40,21 +40,23 @@ LLM node -> JSON Extract -> JSON Validate -> branch on the results
 
 ### JSON Extract
 
-| Parameter | Type   | Required | Description                                          |
-|-----------|--------|----------|------------------------------------------------------|
-| `text`    | string | yes      | Text containing JSON, typically the output of an LLM |
+| Parameter       | Type    | Required | Description                                          |
+|-----------------|---------|----------|------------------------------------------------------|
+| `text`          | string  | yes      | Text containing JSON, typically the output of an LLM |
+| `scan_embedded` | boolean | no       | Off by default; enables shape 3 below                |
 
 Three shapes are recognized, tried in order:
 
 1. the entire input already is JSON, returned as-is;
 2. a ```` ```json ```` or untagged fenced code block, returned verbatim;
 3. the first JSON object or array embedded anywhere in the text, returned
-   verbatim.
+   verbatim — only when `scan_embedded` is on.
 
 Every candidate is decoded before it is accepted, so the extracted string is
 always valid JSON. Shape 3 seeds its scan at `{` and `[`, so bare numbers,
-strings and literals in prose are never mistaken for a result. Text holding
-none of the three shapes is reported as `no_json_found`.
+strings and literals in prose are never mistaken for a result; because it reads
+through surrounding prose, it is off by default. Text holding none of the
+checked shapes is reported as `no_json_found`.
 
 #### Outputs
 
@@ -78,7 +80,7 @@ on failure.
 | `error_type`     | Meaning                                          |
 |------------------|--------------------------------------------------|
 | `invalid_input`  | `text` missing or blank                          |
-| `no_json_found`  | No JSON in any of the three shapes               |
+| `no_json_found`  | No parseable JSON in the shapes that were checked    |
 | `internal_error` | Unexpected failure, e.g. input nested too deeply |
 
 ### JSON Validate

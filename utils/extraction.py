@@ -5,10 +5,11 @@ It tries three shapes in order and returns the first hit:
 
 1. the whole input already is JSON;
 2. a ```json / ``` fenced code block whose content is JSON;
-3. the first JSON object or array embedded anywhere in the text.
+3. the first JSON object or array embedded anywhere in the text, only when
+   ``scan_embedded`` is on.
 
 Every candidate is decoded before it is accepted, so the returned string is
-always valid JSON. Step 3 seeds its scan at ``{`` and ``[``, which keeps bare
+always valid JSON. Shape 3 seeds its scan at ``{`` and ``[``, which keeps bare
 numbers, strings and literals in prose from being mistaken for a result.
 Whether the extracted JSON has the right structure is the JSON Schema
 Validator's business, not this module's.
@@ -38,13 +39,17 @@ _CONTAINER_OPENERS = re.compile(r"[{\[]")
 _TOO_DEEP_DETAIL = "The input is nested too deeply to be parsed"
 
 
-def extract_json(text: str) -> str:
+def extract_json(text: str, *, scan_embedded: bool = False) -> str:
     """Return the first parseable JSON string in ``text``.
+
+    ``scan_embedded`` enables shape 3, which reads through surrounding prose to
+    find a JSON object or array. It is off by default, so only the whole input
+    and trusted code fences are examined unless the caller asks for more.
 
     The returned string is a verbatim slice of the input -- never
     re-serialized -- so number spellings, key order, and whitespace are
     exactly what the model emitted. Raises :class:`ValidationFailure` with
-    ``no_json_found`` when neither shape yields parseable JSON.
+    ``no_json_found`` when none of the checked shapes yields parseable JSON.
     """
     candidate = trim_to_empty(text)
     if not candidate:
@@ -57,14 +62,21 @@ def extract_json(text: str) -> str:
         fenced = trim_to_empty(match.group(2))
         if fenced and _is_parseable(fenced):
             return fenced
-    embedded = _scan_containers(text)
-    if embedded is not None:
-        return embedded
-    raise ValidationFailure(
-        "no_json_found",
-        "No parseable JSON found: the input is not JSON, it contains no "
-        "parseable ```json code block, and it carries no JSON object or array",
-    )
+    if scan_embedded:
+        embedded = _scan_containers(text)
+        if embedded is not None:
+            return embedded
+        detail = (
+            "No parseable JSON found: the input is not JSON, it contains no "
+            "parseable ```json code block, and it carries no JSON object or array"
+        )
+    else:
+        detail = (
+            "No parseable JSON found: the input is not JSON, and it contains no "
+            "parseable ```json code block; scan_embedded is off, so JSON "
+            "embedded in surrounding text was not searched for"
+        )
+    raise ValidationFailure("no_json_found", detail)
 
 
 def _scan_containers(text: str) -> str | None:
