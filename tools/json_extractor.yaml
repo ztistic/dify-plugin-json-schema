@@ -8,7 +8,7 @@ description:
   human:
     en_US: Extract the first parseable JSON string from text, typically LLM output
     zh_Hans: 从文本（通常是 LLM 的输出）中提取第一段可解析的 JSON 字符串
-  llm: "Extract the first parseable JSON string from a text, typically the output of an LLM. Recognizes three shapes in order: the whole text being JSON, a Markdown ```json (or untagged) fenced code block, and -- when scan_embedded is on -- the first JSON object or array embedded anywhere in the text. Every candidate must decode before it is accepted, and the embedded scan considers only object- and array-rooted values, so bare scalars in prose are not mistaken for JSON. Returns found and json_text, or found=false with error_type (invalid_input, no_json_found, internal_error). Pipe the extracted json string into the JSON Schema Validator."
+  llm: "Extract the first parseable JSON string from a text, typically raw LLM output. Tries in order: the whole text, a ```json or untagged fenced code block, and -- only when scan_embedded is true -- the first embedded JSON object or array. Decoding is strict (NaN/Infinity rejected) and the result is a verbatim slice. Returns found and json_text, or found=false with error_type (invalid_input, no_json_found, internal_error). Structure validation is the JSON Validate tool's job."
 parameters:
   - name: text
     type: string
@@ -17,9 +17,9 @@ parameters:
       en_US: Text
       zh_Hans: 文本
     human_description:
-      en_US: Text containing JSON, typically the output of an LLM
-      zh_Hans: 包含 JSON 的文本，通常是 LLM 的输出
-    llm_description: "The text to extract JSON from, typically an LLM answer. Three shapes are recognized in order: the whole text being JSON, a Markdown ```json (or untagged) fenced code block, and -- when scan_embedded is on -- the first JSON object or array embedded in the text."
+      en_US: Text containing JSON, typically LLM output; only the first parseable JSON is extracted, its structure is not validated
+      zh_Hans: 包含 JSON 的文本，通常是 LLM 的输出；仅提取第一段可解析的 JSON，不校验其结构
+    llm_description: "The text to extract JSON from, typically a raw LLM answer. The whole text is tried first, then ```json or untagged fenced code blocks; embedded JSON is searched only when scan_embedded is true. Decoding is strict: NaN and Infinity are not accepted."
     form: llm
   - name: scan_embedded
     type: boolean
@@ -28,9 +28,9 @@ parameters:
       en_US: Scan embedded JSON
       zh_Hans: 扫描内嵌 JSON
     human_description:
-      en_US: Off by default. When on, the extractor also searches the text for the first JSON object or array, beyond whole-text JSON and code fences
-      zh_Hans: 默认关闭。开启后除整体 JSON 与代码围栏外，还从文本中搜寻第一段完整的 JSON 对象或数组
-    llm_description: "Whether to enable the third extraction shape, which searches the text for the first JSON object or array. Defaults to false; turn it on only when the text is expected to mix JSON with surrounding prose."
+      en_US: Off by default; only the boolean value true enables it. When on, the extractor also searches the text for the first JSON object or array, beyond whole-text JSON and code fences
+      zh_Hans: 默认关闭，仅布尔值 true 生效。开启后除整体 JSON 与代码围栏外，还从文本中搜寻第一段 JSON 对象或数组
+    llm_description: "Enable the third extraction shape: scan the text for the first JSON object or array embedded in surrounding prose. Read strictly -- only the boolean true enables it. Turn it on only when JSON is expected to be mixed into other text."
     form: llm
 output_schema:
   type: object

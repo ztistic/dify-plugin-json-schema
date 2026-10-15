@@ -6,9 +6,9 @@ identity:
     zh_Hans: JSON 校验
 description:
   human:
-    en_US: Validate a JSON string against a JSON Schema and return a typed result
-    zh_Hans: 校验 JSON 字符串是否符合指定的 JSON Schema，并返回带类型标记的结果
-  llm: "Validate a JSON string against a JSON Schema. Returns is_valid, error_type, error_detail, json_path, absolute_path and absolute_schema_path. error_type is one of: invalid_input, invalid_json, invalid_schema_json, schema_error, unsupported_draft, ref_resolution_error, internal_error, validation_failed. Use this as a quality gate after an LLM node before consuming structured output downstream."
+    en_US: Validate a JSON string against a JSON Schema (drafts 2020-12 / 2019-09 / 07 / 06 / 04) and return a typed result
+    zh_Hans: 依据 JSON Schema（支持 2020-12 / 2019-09 / 07 / 06 / 04 草案）校验 JSON 字符串，返回带类型标记的结果
+  llm: "Validate a JSON string against a JSON Schema. Both inputs must be raw JSON text: nothing is stripped, and NaN/Infinity are rejected. Drafts 2020-12/2019-09/07/06/04 via $schema (default 2020-12); boolean schemas accepted; only inline $ref resolves. Returns is_valid=true, or is_valid=false with error_type (invalid_input, invalid_json, invalid_schema_json, schema_error, unsupported_draft, ref_resolution_error, validation_failed, internal_error), error_detail, json_path, absolute_path and absolute_schema_path. Typical use: quality gate on the JSON Extract tool's json_text output."
 parameters:
   - name: json_input
     type: string
@@ -17,9 +17,9 @@ parameters:
       en_US: JSON Input
       zh_Hans: JSON 数据
     human_description:
-      en_US: The JSON string to validate (only text that is itself valid JSON; Markdown code fences and other wrappers are not stripped)
-      zh_Hans: 需要校验的 JSON 字符串（仅接受本身即为合法 JSON 的文本，不处理 Markdown 代码围栏等包装）
-    llm_description: The JSON data string to be validated. Must be raw, parseable JSON -- the tool does not strip Markdown code fences or other wrappers, so run the JSON Extractor tool first if the source is an LLM answer.
+      en_US: The JSON string to validate; it must itself be valid JSON -- Markdown code fences and other wrappers are not stripped, and the non-standard constants NaN and Infinity are rejected
+      zh_Hans: 需要校验的 JSON 字符串；其本身必须是合法 JSON——不会剥离 Markdown 代码围栏等包装，NaN、Infinity 等非标准常量会被拒绝
+    llm_description: "The JSON data string to validate. Must be raw, strictly parseable JSON: Markdown fences and other wrappers are not stripped, and the non-standard constants NaN and Infinity are rejected. For raw LLM answers, extract the JSON first with the JSON Extract tool."
     form: llm
   - name: schema_input
     type: string
@@ -28,9 +28,9 @@ parameters:
       en_US: JSON Schema
       zh_Hans: JSON Schema
     human_description:
-      en_US: The JSON Schema used to validate the input
-      zh_Hans: 用于校验输入的 JSON Schema
-    llm_description: "The JSON Schema definition string. Draft 2020-12, 2019-09, 07, 06 and 04 are supported. Only inline $ref pointers can be resolved. The schema is applied exactly as written -- to reject undeclared properties, declare additionalProperties: false yourself."
+      en_US: The JSON Schema to validate against (drafts 2020-12 / 2019-09 / 07 / 06 / 04; only inline $ref pointers resolve)
+      zh_Hans: 用于校验的 JSON Schema（支持 2020-12 / 2019-09 / 07 / 06 / 04 草案，仅可解析文档内联 $ref 指针）
+    llm_description: "The JSON Schema string. The draft is selected from its $schema declaration (2020-12, 2019-09, 07, 06, 04; default 2020-12); a boolean schema is accepted; only inline $ref pointers resolve. The schema is applied exactly as written -- undeclared object properties are allowed unless the schema sets additionalProperties: false."
     form: llm
 output_schema:
   type: object

@@ -8,8 +8,8 @@ label:
   en_US: JSON Schema
   zh_Hans: JSON Schema
 description:
-  en_US: Extract JSON from LLM output and validate it against a JSON Schema, with typed error classification for downstream branching.
-  zh_Hans: 从大模型输出中提取 JSON 并依据 JSON Schema 校验，按错误类型输出结构化结果，便于下游条件分支处理。
+  en_US: Extract JSON from LLM output and validate it against a JSON Schema; every failure is returned as a typed, structured result for downstream branching. Runs fully offline.
+  zh_Hans: 从大模型输出中提取 JSON 并依据 JSON Schema 校验；所有失败均返回带类型标记的结构化结果，便于下游分支处理。完全离线运行。
 icon: icon.svg
 resource:
   memory: 268435456
